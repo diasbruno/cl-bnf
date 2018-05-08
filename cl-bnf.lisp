@@ -8,6 +8,10 @@
   (and (char-not-lessp char #\0)
        (char-not-greaterp char #\9)))
 
+(defmacro single-char (stream ch)
+  `(when (char-equal ,ch (peek-char nil ,stream nil))
+       (string (read-char ,stream nil nil))))
+
 (defmacro one (stream pred)
   `(when (funcall ,pred (peek-char nil ,stream nil))
        (string (read-char ,stream nil nil))))
@@ -43,6 +47,7 @@
     `(defun ,label (source)
        ,(cond
           ((equal kind ':many) `(many source ,expr))
+          ((equal kind ':char) `(single-char source ,expr))
           ((equal kind ':one) `(one source ,expr))
           ((equal kind ':or) `(or-match source (list ,@rules)))
           ((equal kind ':and) `(and-match source (list ,@rules) NIL))))))
@@ -56,8 +61,12 @@
 (:= an
     (:and #'identifier #'ident-or-num))
 
+(:= open-parens (:char #\())
+(:= close-parens (:char #\)))
+(:= fcall (:and #'identifier #'open-parens #'close-parens))
+
 (defun parse (source rules)
   (funcall rules source))
 
-(let ((text (string-to-stream "aaaaa")))
-  (parse text #'identifier))
+(let ((text (string-to-stream "a()")))
+  (parse text #'))
