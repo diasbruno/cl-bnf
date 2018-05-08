@@ -31,13 +31,13 @@
          result
          (or-match source (cdr expr))))))
 
-(defun and-match (source expr stack)
+(defun and-match (source expr)
   (if (null expr)
-      stack
+      nil
       (let* ((c (car expr))
              (result (funcall c source)))
         (if (> (length result) 0)
-            (and-match source (cdr expr) (push result stack))
+            (list result (and-match source (cdr expr)))
             nil))))
 
 (defmacro := (label rule)
@@ -46,11 +46,11 @@
         (expr (cadr rule)))
     `(defun ,label (source)
        ,(cond
-          ((equal kind ':many) `(many source ,expr))
           ((equal kind ':char) `(single-char source ,expr))
           ((equal kind ':one) `(one source ,expr))
+          ((equal kind ':many) `(many source ,expr))
           ((equal kind ':or) `(or-match source (list ,@rules)))
-          ((equal kind ':and) `(and-match source (list ,@rules) NIL))))))
+          ((equal kind ':and) `(and-match source (list ,@rules)))))))
 
 (:= identifier
     (:many #'alpha-char-p))
@@ -59,7 +59,7 @@
 (:= ident-or-num
     (:or #'identifier #'numeric))
 (:= an
-    (:and #'identifier #'ident-or-num))
+    (:and #'identifier #'numeric #'ident-or-num))
 
 (:= open-parens (:char #\())
 (:= close-parens (:char #\)))
