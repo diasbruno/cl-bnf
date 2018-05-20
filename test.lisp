@@ -11,47 +11,46 @@
                       (:one #'numeric-char-p)))
 (:= letter-num (:and (:one #'alpha-char-p)
                      (:one #'numeric-char-p)))
-(:= repeat-abc (:many (:and (:char #\a)
-                            (:char #\b)
-                            (:char #\c))))
+
+(:= abc (:and (:char #\a)
+              (:char #\b)
+              (:char #\c)))
+(:= repeat-abc (:many #'abc))
+
+(:= repeat-abc2 (:many (:or (:and #'abc
+                                  (:many (:char #\space)))
+                            #'abc)))
 
 (5am:def-test test-single-char (:suite test-suite)
-  (5am:is (char-equal (parse (string-to-stream "a") #'single-character)
-                      #\a)))
+  (5am:is (char-equal (parse #'single-character "a") #\a)))
 
 (5am:def-test test-one-char (:suite test-suite)
-  (5am:is (char-equal (parse (string-to-stream "a") #'one-character)
-                      #\a)))
+  (5am:is (char-equal (parse #'one-character "a") #\a)))
 
 (5am:def-test test-many (:suite test-suite)
-  (5am:is (equal (parse (string-to-stream "aa") #'many-a)
-                 '(#\a #\a))))
+  (5am:is (equal (parse #'many-a "aa") '(#\a #\a))))
+
+(5am:def-test test-fail-many (:suite test-suite)
+  (5am:is (equal (parse #'many-a "11") 'nil)))
 
 (5am:def-test test-wording (:suite test-suite)
-  (5am:is (equal (parse (string-to-stream "aa") #'wording)
-                 '(#\a #\a))))
+  (5am:is (equal (parse #'wording "aa") '(#\a #\a))))
 
 (5am:def-test test-or-match (:suite test-suite)
-  (5am:is (char-equal (parse (string-to-stream "1") #'ident-or-num)
-                      #\1)))
+  (5am:is (char-equal (parse #'ident-or-num "1") #\1)))
 
 (5am:def-test test-and-match (:suite test-suite)
-  (5am:is (equal (parse (string-to-stream "a1") #'letter-num)
-                 '(#\a #\1))))
+  (5am:is (equal (parse #'letter-num "a1") '(#\a #\1))))
+
+(5am:def-test test-and-fail-match (:suite test-suite)
+  (5am:is (equal (parse #'letter-num "aa") nil)))
 
 (5am:def-test test-composition (:suite test-suite)
-  (5am:is (equal (parse (string-to-stream "abcabc") #'repeat-abc)
+  (5am:is (equal (parse #'repeat-abc "abcabc")
                  '((#\a #\b #\c) (#\a #\b #\c)))))
 
-
-;; (defvar *ts* nil)
-;; (setq *ts* (make-text-stream :cursor 0
-;; :text "asdf"
-;; :line 0
-;; :column 0
-;; :length (length "asdf")))
-
-;; (let ((text (string-to-stream "a()")))
-;;   (parse text #'an))
+(5am:def-test test-composition2 (:suite test-suite)
+  (5am:is (equal (parse #'repeat-abc2 "abc  abc")
+                 '(((#\a #\b #\c) (#\space #\space)) (#\a #\b #\c)))))
 
 (5am:run-all-tests)
