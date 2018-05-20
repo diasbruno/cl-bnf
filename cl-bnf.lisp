@@ -79,6 +79,12 @@
              (list :match cpy-stream current))
            (list :no-match ,stream)))))
 
+(defun maybe (stream expr)
+  (let ((result (eval-pattern-or-function expr stream)))
+    (if (equal :no-match (car result))
+        (list :match (cadr result) nil)
+        result)))
+
 (defun many (stream expr)
   "Read from STREAM until EXPR terminates the reading."
   (progn
@@ -138,6 +144,7 @@
           (:char (single-char source (cadr item)))
           (:one (one source (cadr (cadr item))))
           (:string (string-match source (cadr item)))
+          (:maybe (maybe source (cadr item)))
           (:many (many source (cadr item)))
           (:and (and-match source (cdr item)))
           (:or (or-match source (cdr item)))))))
