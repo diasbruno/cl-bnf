@@ -18,6 +18,13 @@
 (:= repeat-abc2 (:many (:or (:and #'abc
                                   (:many (:char #\space)))
                             #'abc)))
+(:= spaces (:many (:char #\space)))
+(:= numeric (:many (:one #'numeric-char-p)))
+(:= assignment (:and #'wording
+                     (:maybe #'spaces)
+                     (:char #\=)
+                     (:maybe #'spaces)
+                     #'numeric))
 
 (5am:def-test test-single-char (:suite test-suite)
   (5am:is (char-equal (parse #'single-character "a") #\a)))
@@ -50,5 +57,13 @@
 (5am:def-test test-composition2 (:suite test-suite)
   (5am:is (equal (parse #'repeat-abc2 "abc  abc")
                  '(((#\a #\b #\c) (#\space #\space)) (#\a #\b #\c)))))
+
+(5am:def-test test-assignment (:suite test-suite)
+  (5am:is (equal (parse #'assignment "a=1")
+                 '((#\a)
+                   nil
+                   #\=
+                   nil
+                   (#\1)))))
 
 (5am:run-all-tests)
