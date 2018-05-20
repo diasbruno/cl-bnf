@@ -75,13 +75,13 @@
        (when (and c (char-equal ,ch c))
          (read-char ,stream nil nil)))))
 
-(defmacro many (source expr)
+(defun many (source expr)
   "Read from STREAM until EXPR terminates the reading."
-  `(progn
-     (format t "Runnig many with ~a~%" ,expr)
-     (loop :as item = (eval-pattern-or-function ,expr ,source)
-           :while item
-           :collect item)))
+  (progn
+    (format t "Runnig many with ~a~%" expr)
+    (loop :as item = (eval-pattern-or-function expr source)
+       :while item
+       :collect item)))
 
 (defun or-match (source expr)
    (format t "Running or with ~a ~%" expr)
@@ -112,21 +112,16 @@
               (car item) (type-of (car item))
               (cdr item) (type-of (cdr item)))
       (case (car item)
-            ('function (funcall (cadr item) source))
-            (:char (single-char source (cadr item)))
-            (:one (one source (cadr (cadr item))))
-            (:many (many source (cdr item)))
-            (:and (and-match source (cdr item)))
-            (:or (or-match source (cdr item)))))))
+         ('function (funcall (cadr item) source))
+         (:char (single-char source (cadr item)))
+         (:one (one source (cadr (cadr item))))
+         (:many (many source (cadr item)))
+         (:and (and-match source (cdr item)))
+         (:or (or-match source (cdr item)))))))
 
 (defmacro := (label rule)
   `(defun ,label (source)
-     ,(cond
-       ((equal (car rule) ':char) `(single-char source ',(cadr rule)))
-       ((equal (car rule) ':many) `(many source ',@(cdr rule)))
-       ((equal (car rule) ':one) `(one source ,@(cdr rule)))
-       ((equal (car rule) ':or) `(or-match source ',(cdr rule)))
-       ((equal (car rule) ':and) `(and-match source ',(cdr rule))))))
+     (eval-pattern-or-function ',rule source)))
 
 (defun parse (source rules)
   (funcall rules source))
