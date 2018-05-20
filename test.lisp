@@ -4,6 +4,7 @@
 (5am:def-suite test-suite :description "Suite for tests which should fail.")
 
 (:= single-character (:char #\a))
+(:= one-character (:one #'alpha-char-p))
 (:= many-a (:many (:char #\a)))
 (:= wording (:many #'single-character))
 (:= ident-or-num (:or (:one #'alpha-char-p)
@@ -16,6 +17,10 @@
 
 (5am:def-test test-single-char (:suite test-suite)
   (5am:is (char-equal (parse (string-to-stream "a") #'single-character)
+                      #\a)))
+
+(5am:def-test test-one-char (:suite test-suite)
+  (5am:is (char-equal (parse (string-to-stream "a") #'one-character)
                       #\a)))
 
 (5am:def-test test-many (:suite test-suite)
