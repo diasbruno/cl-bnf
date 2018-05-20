@@ -48,13 +48,13 @@
         (word nil)
         (ts2 (copy-text-stream ts)))
     (loop :for c = (next-char ts2 :eof-char :eof)
-          :for d :in (coerce str 'list)
-          :if (and (not (equal :eof c)) (char-equal c d))
-          :do (setf word (concatenate 'string word (string c)))
-          :else :do (setf stopped t)
-          :finally (if stopped
-                       (return (values :match ts2 word))
-                     (return (values :no-match ts))))))
+       :for d :in (coerce str 'list)
+       :if (and (not (equal :eof c)) (char-equal c d))
+       :do (setf word (concatenate 'string word (string c)))
+       :else :do (setf stopped t)
+       :finally (if stopped
+                    (return (values :match ts2 word))
+                    (return (values :no-match ts))))))
 
 (defun string-to-stream (string)
   "Parse from a STRING."
@@ -65,63 +65,95 @@
        (char-not-greaterp char #\9)))
 
 (defmacro one (stream pred)
-  `(when (funcall ,pred (peek-char nil ,stream nil))
-     (read-char ,stream nil nil)))
+  `(let* ((cpy-stream (copy-text-stream ,stream))
+          (current (next-char cpy-stream)))
+     (if (funcall ,pred current)
+         (progn
+           (format t "Result of one ~a stream ~a~%" current ,stream)
+           (list :match cpy-stream current))
+         (list :no-match ,stream))))
 
 (defmacro single-char (stream ch)
   `(progn
-     (format t "Runnig single-char with ~a~%" ,ch)
-     (let ((c (peek-char nil ,stream nil)))
-       (when (and c (char-equal ,ch c))
-         (read-char ,stream nil nil)))))
+     (format t "Runnig single-char with ~a stream ~a~%" ,ch ,stream)
+     (let* ((cpy-stream (copy-text-stream ,stream))
+            (current (next-char cpy-stream)))
+       (if (and current (char-equal ,ch current))
+           (progn
+             (format t "Result of single-char ~a.~%" current)
+             (list :match cpy-stream current))
+           (list :no-match ,stream)))))
 
-(defun many (source expr)
+(defun many (stream expr)
   "Read from STREAM until EXPR terminates the reading."
   (progn
-    (format t "Runnig many with ~a~%" expr)
-    (loop :as item = (eval-pattern-or-function expr source)
-       :while item
-       :collect item)))
+    (format t "Runnig many with ~a stream ~a~%" expr stream)
+    (let* ((cp-stream stream)
+           (result (loop :as item = (eval-pattern-or-function expr cp-stream)
+                      :while (equal :match (car item))
+                      :collect (progn
+                                 (setf cp-stream (cadr item))
+                                 (caddr item)))))
+      (format t "Many result ~a." result)
+      (if (> (length result) 0)
+          (list :match cp-stream result)
+          (list :no-match stream)))))
 
-(defun or-match (source expr)
-   (format t "Running or with ~a ~%" expr)
-   (when (not (null expr))
-     (let* ((c (car expr))
-            (result (eval-pattern-or-function c source)))
-       (format t "Or result of ~a: ~a~%" c result)
-       (if result
-           result
-           (or-match source (cdr expr))))))
-
-(defun and-match (source expr)
-  (format t "Running and with ~a ~%" expr)
-  (unless (null expr)
+(defun or-match (stream expr)
+  (format t "Running or with ~a stream ~a~%" expr stream)
+  (when (not (null expr))
     (let* ((c (car expr))
-           (result (eval-pattern-or-function c source)))
-      (when result
-        (format t "And result of ~a: ~a~%" c result)
-        (cons result (and-match source (cdr expr)))))))
+           (result (eval-pattern-or-function c stream)))
+      (format t "Or result of ~a: ~a~%" c result)
+      (if (equal :match (car result))
+          result
+          (or-match stream (cdr expr))))))
+
+(defun and-match (stream expr)
+  (format t "Running and with ~a stream ~a~%" expr stream)
+  (let* ((cp-stream stream)
+         (result (block nil
+                   (loop
+                      :for e :in expr
+                      :as item = (eval-pattern-or-function e cp-stream)
+                      :if (equal :match (car item))
+                      :collect (progn
+                                 (setf cp-stream (cadr item))
+                                 (caddr item))
+                      :else :do (progn
+                                  (format t "Bailing out ~a.~%" e)
+                                  (return nil))))))
+    (format t "And Result ~a stream ~a~%" result cp-stream)
+    (if result
+        (list :match cp-stream result)
+        (list :no-match stream))))
 
 (defun eval-pattern-or-function (item source)
   (format t "Evaluating ~a is ~a~%" item (type-of item))
   (if (eql (type-of item) 'function)
       (prog1 (funcall item source)
         (format t "Applying function ~a~%" item))
-    (progn
-      (format t "Expression ~a is ~a, ~a is ~a~%"
-              (car item) (type-of (car item))
-              (cdr item) (type-of (cdr item)))
-      (case (car item)
-         ('function (funcall (cadr item) source))
-         (:char (single-char source (cadr item)))
-         (:one (one source (cadr (cadr item))))
-         (:many (many source (cadr item)))
-         (:and (and-match source (cdr item)))
-         (:or (or-match source (cdr item)))))))
+      (progn
+        (format t "Expression ~a is ~a, ~a is ~a~%"
+                (car item) (type-of (car item))
+                (cdr item) (type-of (cdr item)))
+        (case (car item)
+          ('function (funcall (cadr item) source))
+          (:char (single-char source (cadr item)))
+          (:one (one source (cadr (cadr item))))
+          (:many (many source (cadr item)))
+          (:and (and-match source (cdr item)))
+          (:or (or-match source (cdr item)))))))
 
 (defmacro := (label rule)
   `(defun ,label (source)
      (eval-pattern-or-function ',rule source)))
 
-(defun parse (source rules)
-  (funcall rules source))
+(defun parse (rules source)
+  (let ((stream (make-text-stream :cursor 0
+                                  :text source
+                                  :line 0
+                                  :column 0
+                                  :length (length source))))
+    (let ((result (funcall rules stream)))
+      (caddr result))))
