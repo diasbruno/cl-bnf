@@ -12,9 +12,7 @@
 (:= letter-num (:and (:one #'alpha-char-p)
                      (:one #'numeric-char-p)))
 
-(:= abc (:and (:char #\a)
-              (:char #\b)
-              (:char #\c)))
+(:= abc (:string "abc"))
 (:= repeat-abc (:many #'abc))
 
 (:= repeat-abc2 (:many (:or (:and #'abc
