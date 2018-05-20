@@ -58,13 +58,15 @@
        (char-not-greaterp char #\9)))
 
 (defmacro one (stream pred)
-  `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (next-char cpy-stream)))
-     (if (funcall ,pred current)
-         (progn
-           (format t "Result of one ~a stream ~a~%" current ,stream)
-           (list :match cpy-stream current))
-         (list :no-match ,stream))))
+  `(progn
+     (format t "Running one with ~a stream ~a.~%" ,pred ,stream)
+     (let* ((cpy-stream (copy-text-stream ,stream))
+            (current (next-char cpy-stream)))
+       (if (and current (funcall ,pred current))
+           (progn
+             (format t "Result of one ~a stream ~a~%" current ,stream)
+             (list :match cpy-stream current))
+           (list :no-match ,stream)))))
 
 (defmacro single-char (stream ch)
   `(progn
@@ -82,7 +84,8 @@
   (progn
     (format t "Runnig many with ~a stream ~a~%" expr stream)
     (let* ((cp-stream stream)
-           (result (loop :as item = (eval-pattern-or-function expr cp-stream)
+           (result (loop
+                      :as item = (eval-pattern-or-function expr cp-stream)
                       :while (equal :match (car item))
                       :collect (progn
                                  (setf cp-stream (cadr item))
