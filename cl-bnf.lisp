@@ -34,27 +34,20 @@
   (setf (text-stream-cursor ts)
         (max (decf (text-stream-cursor ts)) 0)))
 
-(defun match-char (ts ch)
-  (let ((c (next-char ts :eof-char :eof)))
-    (if (char-equal c ch)
-        (values :match c ts)
-        (progn
-          (back-char ts)
-          (values :no-match ts)))))
-
-(defun match-string (ts str)
+(defun string-match (stream str)
   "Check if the next word in TS is in STR."
-  (let ((stopped nil)
-        (word nil)
-        (ts2 (copy-text-stream ts)))
-    (loop :for c = (next-char ts2 :eof-char :eof)
-       :for d :in (coerce str 'list)
-       :if (and (not (equal :eof c)) (char-equal c d))
-       :do (setf word (concatenate 'string word (string c)))
-       :else :do (setf stopped t)
-       :finally (if stopped
-                    (return (values :match ts2 word))
-                    (return (values :no-match ts))))))
+  (let* ((cp-stream (copy-text-stream stream))
+         (result (loop
+                    :for c = (next-char cp-stream :eof-char :eof)
+                    :for d :in (coerce str 'list)
+                    :if (and (not (equal :eof c)) (char-equal c d))
+                    :collect c)))
+    (format t "Match string result ~a stream ~a.~%" result cp-stream)
+    (if (= (length str) (length result))
+        (progn
+          (back-char cp-stream)
+          (list :match cp-stream result))
+        (list :no-match stream))))
 
 (defun string-to-stream (string)
   "Parse from a STRING."
@@ -141,6 +134,7 @@
           ('function (funcall (cadr item) source))
           (:char (single-char source (cadr item)))
           (:one (one source (cadr (cadr item))))
+          (:string (string-match source (cadr item)))
           (:many (many source (cadr item)))
           (:and (and-match source (cdr item)))
           (:or (or-match source (cdr item)))))))
