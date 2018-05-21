@@ -1,19 +1,3 @@
-;;  - Leaf
-;; :char
-;; :string
-;;
-;; - Nodes
-;; :or
-;; :and
-;; :* = 0 or many
-;; :? = maybe one
-;; :+ = many
-;;
-;; - Idea
-;; (match :* :one-of "abc")
-;; (match :* :char "abc")
-;; (match :* :char "abc")
-
 (defstruct text-stream
   cursor
   text
