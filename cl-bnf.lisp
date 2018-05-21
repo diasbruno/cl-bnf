@@ -105,9 +105,24 @@
         (:and (and-match source (cdr item)))
         (:or (or-match source (cdr item))))))
 
-(defmacro := (label rule)
+(defun id (x)
+  "Identity function."
+  x)
+
+(defmacro := (label rule &optional transform)
+  "Generate a function LABEL to parse RULE. Later,
+you can apply a TRANSFORMATION which can be a function
+or a keytword."
   `(defun ,label (source)
-     (eval-pattern-or-function ',rule source)))
+     (let ((result (eval-pattern-or-function ',rule source)))
+       (if (equal :match (car result))
+           (list :match (cadr result)
+                 ,(if transform
+                      (case (type-of transform)
+                        (keyword `(cons ,transform (nth 2 result)))
+                        (t `(funcall ,transform (nth 2 result))))
+                      '(nth 2 result)))
+           result))))
 
 (defun parse (rules source)
   (let ((stream (make-text-stream :cursor 0
