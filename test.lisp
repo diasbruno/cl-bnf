@@ -18,9 +18,12 @@
 (:= repeat-abc2 (:many (:or (:and #'abc
                                   (:many (:char #\space)))
                             #'abc)))
-(:= spaces (:many (:char #\space)))
+
+(:= identifier (:many #'single-character) :identifier)
+
 (:= numeric (:many (:one #'numeric-char-p)))
-(:= assignment (:and #'wording
+(:= spaces (:many (:char #\space)))
+(:= assignment (:and #'Identifier
                      (:maybe #'spaces)
                      (:char #\=)
                      (:maybe #'spaces)
@@ -60,7 +63,7 @@
 
 (5am:def-test test-assignment (:suite test-suite)
   (5am:is (equal (parse #'assignment "a=1")
-                 '((#\a)
+                 '((:identifier #\a)
                    nil
                    #\=
                    nil
