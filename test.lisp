@@ -42,19 +42,25 @@
     :call (lambda (x)
             (cons :identifier (stringify x))))
 
-(:= numeric (:and (:maybe (:char #\-))
-                                        ; 0|[1-9]
-                  (:or (:char #\0)
-                       (:many (:one #'numeric-char-p)))
-                                        ; .[0-9]
-                  (:maybe (:and (:char #\.)
-                                (:one #'numeric-char-p)))
-                                        ; [e|E][-|+]?[0-9]+
-                  (:maybe (:and (:or (:char #\e)
-                                     (:char #\E))
-                                (:maybe (:char #\+)
-                                        (:char #\-))
-                                (:many (:one #'numeric-char-p)))))
+(:= decimal-number (:many (:one #'numeric-char-p)))
+(:= real-number (:or (:and #'decimal-number
+                           (:char #\.)
+                           #'decimal-number)
+                     (:and #'decimal-number
+                           (:char #\.))))
+(:= signed-part (:or (:char #\+) (:char #\-)))
+(:= exp-chars (:or (:char #\e)
+                   (:char #\E)))
+(:= exp-part (:or (:and #'exp-chars
+                        #'signed-part
+                        #'decimal-number)
+                  (:and #'exp-chars
+                        #'decimal-number)))
+(:= numeric (:or #'real-number
+                 #'decimal-number))
+(:= number-literal (:or (:and #'numeric
+                              #'exp-part)
+                        #'numeric)
     :call (lambda (matches)
             (cons :number (stringify matches))))
 
@@ -64,7 +70,7 @@
                      (:maybe #'spaces)
                      (:char #\=)
                      (:maybe #'spaces)
-                     #'numeric)
+                     #'number-literal)
     :apply (lambda (lhs sp e sp2 expr)
              (declare (ignore e sp sp2))
              `(:assignment ,lhs ,expr)))
@@ -100,6 +106,10 @@
 (5am:def-test test-composition2 (:suite test-suite)
   (5am:is (equal (parse #'repeat-abc2 "abc  abc")
                  '(((#\a #\b #\c) (#\space #\space)) (#\a #\b #\c)))))
+
+(5am:def-test test-number-literal (:suite test-suite)
+  (5am:is (equal (parse #'number-literal "1")
+                 '(:number . "1"))))
 
 (5am:def-test test-assignment (:suite test-suite)
   (5am:is (equal (parse #'assignment "a=1")
