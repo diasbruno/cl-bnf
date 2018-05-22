@@ -1,3 +1,10 @@
+(defpackage :cl-bnf
+  (:use #:cl)
+  (:export #:parse
+           ":="))
+
+(in-package :cl-bnf)
+
 (defstruct text-stream
   cursor
   text

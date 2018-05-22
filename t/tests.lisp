@@ -1,5 +1,7 @@
-(load #P"~/projects/cl-bnf/cl-bnf.lisp")
-(quicklisp:quickload 'fiveam)
+(defpackage #:cl-bnf-tests
+  (:use #:cl #:fiveam #:cl-bnf))
+
+(in-package :cl-bnf-tests)
 
 (5am:def-suite test-suite
     :description "Suite for tests which should fail.")
@@ -115,5 +117,3 @@
   (5am:is (equal (parse #'assignment "a=1")
                  '(:assignment (:identifier . "a")
                    (:number . "1")))))
-
-(5am:run-all-tests)
