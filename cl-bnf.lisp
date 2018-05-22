@@ -18,49 +18,49 @@
   (setf (text-stream-cursor ts)
         (max (decf (text-stream-cursor ts)) 0)))
 
-(defun string-match (stream str)
-  "Check if the next word in TS is in STR."
-  (let* ((cp-stream (copy-text-stream stream))
-         (result (loop
-                    :for c = (next-char cp-stream :eof-char :eof)
-                    :for d :in (coerce str 'list)
-                    :if (and (not (equal :eof c)) (char-equal c d))
-                    :collect c)))
-    (if (= (length str) (length result))
-        (progn
-          (back-char cp-stream)
-          (list :match cp-stream result))
-        (list :no-match stream))))
-
-(defun numeric-char-p (char)
-  (and (char-not-lessp char #\0)
-       (char-not-greaterp char #\9)))
-
 (defmacro one (stream pred)
+  "Get a single char from the STREAM and test against PRED."
   `(let* ((cpy-stream (copy-text-stream ,stream))
           (current (next-char cpy-stream)))
      (if (and current (funcall ,pred current))
          (list :match cpy-stream current)
          (list :no-match ,stream))))
 
-(defmacro single-char (stream ch)
+(defmacro single-char (stream char)
+  "Get a single char from the STREAM and test against CHAR."
   `(let* ((cpy-stream (copy-text-stream ,stream))
           (current (next-char cpy-stream)))
-     (if (and current (char-equal ,ch current))
+     (if (and current (char-equal ,char current))
          (list :match cpy-stream current)
          (list :no-match ,stream))))
 
-(defun maybe-match (stream expr)
-  (let ((result (eval-pattern-or-function expr stream)))
+(defun string-match (stream string)
+  "String pattern to be run on STREAM with STRING."
+  (let* ((cp-stream (copy-text-stream stream))
+         (result (loop
+                    :for c = (next-char cp-stream :eof-char :eof)
+                    :for d :in (coerce string 'list)
+                    :if (and (not (equal :eof c)) (char-equal c d))
+                    :collect c)))
+    (if (= (length string) (length result))
+        (progn
+          (back-char cp-stream)
+          (list :match cp-stream result))
+        (list :no-match stream))))
+
+(defun maybe-match (stream expression)
+  "Maybe pattern to be run on STREAM with EXPRESSION."
+  (let ((result (eval-pattern-or-function expression stream)))
     (if (equal :no-match (car result))
         (list :match (cadr result) nil)
         result)))
 
-(defun many-matches (stream expr)
-  "Read from STREAM until EXPR terminates the reading."
+(defun many-matches (stream expression)
+  "Many pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
          (result (loop
-                    :as item = (eval-pattern-or-function expr cp-stream)
+                    :as item = (eval-pattern-or-function expression
+                                                         cp-stream)
                     :while (equal :match (car item))
                     :collect (progn
                                (setf cp-stream (cadr item))
@@ -69,19 +69,21 @@
         (list :match cp-stream result)
         (list :no-match stream))))
 
-(defun or-match (stream expr)
-  (when (not (null expr))
-    (let* ((c (car expr))
+(defun or-match (stream expression)
+  "Or pattern to be run on STREAM with EXPRESSION."
+  (when (not (null expression))
+    (let* ((c (car expression))
            (result (eval-pattern-or-function c stream)))
       (if (equal :match (car result))
           result
-          (or-match stream (cdr expr))))))
+          (or-match stream (cdr expression))))))
 
-(defun and-match (stream expr)
+(defun and-match (stream expression)
+  "And pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
          (result (block nil
                    (loop
-                      :for e :in expr
+                      :for e :in expression
                       :as item = (eval-pattern-or-function e cp-stream)
                       :if (equal :match (car item))
                       :collect (progn
@@ -93,6 +95,7 @@
         (list :no-match stream))))
 
 (defun eval-pattern-or-function (item source)
+  "Evaluate a patter or function for ITEM an use SOURCE."
   (if (eql (type-of item) 'function)
       (funcall item source)
       (case (car item)
@@ -105,11 +108,7 @@
         (:and (and-match source (cdr item)))
         (:or (or-match source (cdr item))))))
 
-(defun id (x)
-  "Identity function."
-  x)
-
-(defmacro := (label rule &optional transform)
+(defmacro := (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
@@ -117,14 +116,15 @@ or a keytword."
      (let ((result (eval-pattern-or-function ',rule source)))
        (if (equal :match (car result))
            (list :match (cadr result)
-                 ,(if transform
-                      (case (type-of transform)
-                        (keyword `(cons ,transform (nth 2 result)))
-                        (t `(funcall ,transform (nth 2 result))))
-                      '(nth 2 result)))
+                 ,(cond
+                    (call `(funcall ,call (nth 2 result)))
+                    (apply `(apply ,apply (nth 2 result)))
+                    (tag `(cons ,tag (nth 2 result)))
+                    (t `(nth 2 result))))
            result))))
 
 (defun parse (rules source)
+  "Parse according to the RULES on SOURCE."
   (let ((stream (make-text-stream :cursor 0
                                   :text source
                                   :line 0

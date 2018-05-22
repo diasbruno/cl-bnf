@@ -1,7 +1,26 @@
 (load #P"~/projects/cl-bnf/cl-bnf.lisp")
 (quicklisp:quickload 'fiveam)
 
-(5am:def-suite test-suite :description "Suite for tests which should fail.")
+(5am:def-suite test-suite
+    :description "Suite for tests which should fail.")
+
+(defun stringify (vs)
+  (if vs
+    (case (type-of vs)
+     (standard-char (string vs))
+     (t (reduce (lambda (acc x)
+                  (concatenate 'string acc
+                               (if x
+                                   (case (type-of x)
+                                     (standard-char (string x))
+                                     (list (stringify x))
+                                     (cons (stringify x)))
+                                   ""))) vs :initial-value "")))
+    ""))
+
+(defun numeric-char-p (char)
+  (and (char-not-lessp char #\0)
+       (char-not-greaterp char #\9)))
 
 (:= single-character (:char #\a))
 (:= one-character (:one #'alpha-char-p))
@@ -19,15 +38,36 @@
                                   (:many (:char #\space)))
                             #'abc)))
 
-(:= identifier (:many #'single-character) :identifier)
+(:= identifier (:many #'single-character)
+    :call (lambda (x)
+            (cons :identifier (stringify x))))
 
-(:= numeric (:many (:one #'numeric-char-p)))
+(:= numeric (:and (:maybe (:char #\-))
+                                        ; 0|[1-9]
+                  (:or (:char #\0)
+                       (:many (:one #'numeric-char-p)))
+                                        ; .[0-9]
+                  (:maybe (:and (:char #\.)
+                                (:one #'numeric-char-p)))
+                                        ; [e|E][-|+]?[0-9]+
+                  (:maybe (:and (:or (:char #\e)
+                                     (:char #\E))
+                                (:maybe (:char #\+)
+                                        (:char #\-))
+                                (:many (:one #'numeric-char-p)))))
+    :call (lambda (matches)
+            (cons :number (stringify matches))))
+
 (:= spaces (:many (:char #\space)))
-(:= assignment (:and #'Identifier
+
+(:= assignment (:and #'identifier
                      (:maybe #'spaces)
                      (:char #\=)
                      (:maybe #'spaces)
-                     #'numeric))
+                     #'numeric)
+    :apply (lambda (lhs sp e sp2 expr)
+             (declare (ignore e sp sp2))
+             `(:assignment ,lhs ,expr)))
 
 (5am:def-test test-single-char (:suite test-suite)
   (5am:is (char-equal (parse #'single-character "a") #\a)))
@@ -63,10 +103,7 @@
 
 (5am:def-test test-assignment (:suite test-suite)
   (5am:is (equal (parse #'assignment "a=1")
-                 '((:identifier #\a)
-                   nil
-                   #\=
-                   nil
-                   (#\1)))))
+                 '(:assignment (:identifier . "a")
+                   (:number . "1")))))
 
 (5am:run-all-tests)
