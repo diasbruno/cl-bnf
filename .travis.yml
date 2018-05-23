@@ -14,4 +14,4 @@ install:
     fi
 
 script:
-  - make tests
+  - make run-tests

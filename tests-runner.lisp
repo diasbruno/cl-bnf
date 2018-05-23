@@ -1,8 +1,5 @@
 (push *default-pathname-defaults* ql:*local-project-directories*)
 
-(format t "~a~%" ql:*local-project-directories*)
-
-(quicklisp:quickload :cl-bnf)
 (quicklisp:quickload :cl-bnf-tests)
 
 (setq fiveam:*on-error* :debug)

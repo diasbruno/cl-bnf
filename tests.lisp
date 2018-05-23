@@ -33,6 +33,10 @@
 (:= letter-num (:and (:one #'alpha-char-p)
                      (:one #'numeric-char-p)))
 
+(:= identifier (:many #'single-character)
+    :call (lambda (x)
+            (cons :identifier (stringify x))))
+
 (:= abc (:string "abc"))
 (:= repeat-abc (:many #'abc))
 
@@ -40,34 +44,10 @@
                                   (:many (:char #\space)))
                             #'abc)))
 
-(:= identifier (:many #'single-character)
-    :call (lambda (x)
-            (cons :identifier (stringify x))))
-
-(:= decimal-number (:many (:one #'numeric-char-p)))
-(:= real-number (:or (:and #'decimal-number
-                           (:char #\.)
-                           #'decimal-number)
-                     (:and #'decimal-number
-                           (:char #\.))))
-(:= signed-part (:or (:char #\+) (:char #\-)))
-(:= exp-chars (:or (:char #\e)
-                   (:char #\E)))
-(:= exp-part (:or (:and #'exp-chars
-                        #'signed-part
-                        #'decimal-number)
-                  (:and #'exp-chars
-                        #'decimal-number)))
-(:= numeric (:or #'real-number
-                 #'decimal-number))
-(:= number-literal (:or (:and #'numeric
-                              #'exp-part)
-                        #'numeric)
-    :call (lambda (matches)
-            (cons :number (stringify matches))))
-
 (:= spaces (:many (:char #\space)))
 
+(:= number-literal (:many (:one #'numeric-char-p))
+    :call (lambda (value) (cons :number (stringify value))))
 (:= assignment (:and #'identifier
                      (:maybe #'spaces)
                      (:char #\=)
@@ -108,10 +88,6 @@
 (5am:def-test test-composition2 (:suite test-suite)
   (5am:is (equal (parse #'repeat-abc2 "abc  abc")
                  '(((#\a #\b #\c) (#\space #\space)) (#\a #\b #\c)))))
-
-(5am:def-test test-number-literal (:suite test-suite)
-  (5am:is (equal (parse #'number-literal "1")
-                 '(:number . "1"))))
 
 (5am:def-test test-assignment (:suite test-suite)
   (5am:is (equal (parse #'assignment "a=1")
