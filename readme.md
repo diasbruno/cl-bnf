@@ -2,7 +2,7 @@
 
 A simple BNF.
 
-## Rules
+## tokens & terms
 
 - `(:char #\a)` test the next element on the stream with the given char.
 - `(:one #'fn)` test using a function to get the next char in the stream.
@@ -12,12 +12,42 @@ A simple BNF.
 - `(:many exp)` collect all matches of the expression, if any.
 - `(:maybe exp)` turns the failed test into a valid one.
 
-## Declaration
+## rules & grammars
 
-A macro is used to declare all rules for the BNF.
+You can define a single rule using `define-rule`
 
 ```lisp
-(:= word (:many (:one #'alpha-char-p)) :call #'stringify)
+(define-rule word (:many (:one #'alpha-char-p)) :call #'stringify)
+```
+
+...or using the `define-grammar`
+
+```lisp
+(define-grammar json-number
+   decimal-number := (:many (:one #'numeric-char-p))
+
+   real-number := (:or (:and #'decimal-number
+                             (:char #\.)
+                             #'decimal-number)
+                       (:and #'decimal-number
+                             (:char #\.)))
+
+   signed-part := (:or (:char #\+) (:char #\-))
+
+   exp-chars := (:or (:char #\e) (:char #\E))
+
+   exp-part := (:and #'exp-chars
+                     #'signed-part
+                     (:maybe #'decimal-number))
+
+   numeric := (:or #'real-number #'decimal-number))
+
+   number-literal := (:or (:and #'numeric
+                                #'exp-part)
+                          #'numeric) :call (lambda (matches)
+                                             (cons :number (stringify matches)))
+
+(parse #number-literal "1e3")
 ```
 
 #### Using transformations:
@@ -25,37 +55,7 @@ A macro is used to declare all rules for the BNF.
 - `:call` apply a function to the results using `funcall`.
 - `:apply` apply a function to the results using `apply`.
 - `:tag` return a cons like `(cons TAG RESULTS)`.
-- If none where specified, it return a nested list of all matches.
-
-## Example
-
-Parsing a valid json number:
-
-```lisp
-(:= decimal-number (:many (:one #'numeric-char-p)))
-(:= real-number (:or (:and #'decimal-number
-                           (:char #\.)
-                           #'decimal-number)
-                     (:and #'decimal-number
-                           (:char #\.))))
-(:= signed-part (:or (:char #\+) (:char #\-)))
-(:= exp-chars (:or (:char #\e)
-                   (:char #\E)))
-(:= exp-part (:or (:and #'exp-chars
-                        #'signed-part
-                        #'decimal-number)
-                  (:and #'exp-chars
-                        #'decimal-number)))
-(:= numeric (:or #'real-number
-                 #'decimal-number))
-(:= number-literal (:or (:and #'numeric
-                              #'exp-part)
-                        #'numeric)
-    :call (lambda (matches)
-            (cons :number (stringify matches))))
-
-(parse #number-literal "1e3")
-```
+- If none where specified, it return a list of all matches.
 
 ## License
 

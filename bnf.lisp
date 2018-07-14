@@ -1,7 +1,8 @@
 (defpackage :cl-bnf
   (:use #:cl)
   (:export #:parse
-           ":="))
+           #:define-rule
+           #:define-grammar))
 
 (in-package :cl-bnf)
 
@@ -115,7 +116,7 @@
         (:and (and-match source (cdr item)))
         (:or (or-match source (cdr item))))))
 
-(defmacro := (label rule &key call tag apply)
+(defmacro define-rule (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
@@ -139,3 +140,47 @@ or a keytword."
                                   :length (length source))))
     (let ((result (funcall rules stream)))
       (caddr result))))
+
+(defmacro define-grammar (label &rest rules)
+  (if rules
+      (let* ((transform (nth 3 rules))
+             (has-transform (and transform (keywordp transform)))
+             (slice (if has-transform 5 3)))
+        (progn
+          (if has-transform
+              (let ((transform-value (nth 4 rules)))
+                (cond
+                  ((not (member transform '(:tag :call :apply)))
+                   (error (format NIL
+                                  "Tranform kind must be one of :tag, :call or :apply~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
+                                  (car rules)
+                                  (nth 2 rules)
+                                  transform
+                                  transform-value)))
+                  ((and (not (eq :tag transform))
+                        (not (or (functionp transform-value)
+                                 (and (consp transform-value)
+                                      (eq 'lambda (car transform-value))))))
+                   (error (format NIL
+                                  "Tranform must be a function~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
+                                  (car rules)
+                                  (nth 2 rules)
+                                  transform
+                                  transform-value)))
+                  ((and (eq :tag transform)
+                        (or (functionp transform-value)
+                            (not (keywordp transform-value))))
+                   (error (format NIL
+                                  ":tag must be a symbol~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
+                                  (car rules)
+                                  (nth 2 rules)
+                                  transform
+                                  transform-value)))
+                  (t (macroexpand `(define-rule ,(car rules) ,(nth 2 rules)
+                                                ,transform ,transform-value)))))
+
+              (macroexpand `(define-rule ,(car rules) ,(nth 2 rules))))
+          (when (>= (length rules) slice)
+            (macroexpand `(define-grammar ,label
+                            ,@(subseq rules slice))))))
+      t))
