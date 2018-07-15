@@ -4,4 +4,5 @@
   :license "MIT"
   :serial t
   :depends-on (#:cl-bnf)
-  :components ((:file "json-parse")))
+  :components ((:module "example"
+                :components ((:file "json-parse")))))

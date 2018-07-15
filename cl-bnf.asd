@@ -3,4 +3,5 @@
   :author "Bruno Dias <dias.h.bruno@gmail.com>"
   :license "MIT"
   :serial t
-  :components ((:file "bnf")))
+  :components ((:module "src"
+                :components ((:file "bnf")))))

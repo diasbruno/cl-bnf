@@ -50,14 +50,14 @@
 
 (define-rule number-literal (:many (:one #'numeric-char-p))
              :call (lambda (value) (cons :number (stringify value))))
-(define-rule assignment (:and #'identifier
-                              (:maybe #'spaces)
-                              (:char #\=)
-                              (:maybe #'spaces)
-                              #'number-literal)
-             :apply (lambda (lhs sp e sp2 expr)
-                      (declare (ignore e sp sp2))
-                      `(:assignment ,lhs ,expr)))
+(define-grammar assignment
+    assignment := (:and #'identifier
+                        (:maybe #'spaces)
+                        (:char #\=)
+                        (:maybe #'spaces)
+                        #'number-literal) :apply (lambda (lhs sp e sp2 expr)
+                                                   (declare (ignore e sp sp2))
+                                                   `(:assignment ,lhs ,expr)))
 
 (5am:def-test test-single-char (:suite test-suite)
   (5am:is (char-equal (parse #'single-character "a") #\a)))
