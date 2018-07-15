@@ -6,6 +6,8 @@
 
 (in-package :cl-bnf)
 
+(defvar *table* nil)
+
 (defstruct text-stream
   cursor
   text
@@ -176,11 +178,14 @@ or a keytword."
                                   (nth 2 rules)
                                   transform
                                   transform-value)))
-                  (t (macroexpand `(define-rule ,(car rules) ,(nth 2 rules)
-                                                ,transform ,transform-value)))))
+                  (t (push (macroexpand `(define-rule ,(car rules) ,(nth 2 rules)
+                                           ,transform ,transform-value)) *table*))))
 
-              (macroexpand `(define-rule ,(car rules) ,(nth 2 rules))))
+              (push (macroexpand `(define-rule ,(car rules) ,(nth 2 rules))) *table*))
           (when (>= (length rules) slice)
             (macroexpand `(define-grammar ,label
-                            ,@(subseq rules slice))))))
-      t))
+                              ,@(subseq rules slice))))))
+      `(block nil (let ((table *table*))
+                    (progn
+                      (setf *table* nil)
+                      ,@*table*)))))
