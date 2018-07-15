@@ -118,12 +118,22 @@
         (:and (and-match source (cdr item)))
         (:or (or-match source (cdr item))))))
 
+(defun term-normalizer (terms)
+  "Adjust terms some patterns on TERMS."
+  (when terms
+    (case (car terms)
+      (:one-of `(:or ,@(mapcar #'term-normalizer (cdr terms))))
+      (:between (let ((ends (cadr terms)))
+                  `(:and ,ends ,@(cddr terms) ,ends)))
+      (t (cons (car terms) (term-normalizer (cdr terms)))))))
+
 (defmacro define-rule (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
+  (format t "~a~%" (term-normalizer rule))
   `(defun ,label (source)
-     (let ((result (eval-pattern-or-function ',rule source)))
+     (let ((result (eval-pattern-or-function ',(term-normalizer rule) source)))
        (if (equal :match (car result))
            (list :match (cadr result)
                  ,(cond

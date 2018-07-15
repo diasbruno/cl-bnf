@@ -65,13 +65,6 @@
                                      (:char #\b)
                                      (:char #\\)
                                      (:char #\/))))
-(define-rule string-literal (:and (:char #\")
-                                  (:many (:or #'escaped-char
-                                              (:one #'alpha-char-p)))
-                                  (:char #\"))
-             :apply (lambda (a str b)
-                      (declare (ignore a b))
-                      (cons :string (stringify str))))
 
 ;; object
 
@@ -108,12 +101,6 @@
 
 ;; array
 
-(define-rule empty-array (:and (:char #\[)
-                               (:maybe #'spaces)
-                               (:char #\]))
-             :call (lambda (x)
-                     (declare (ignore x))
-                     '(:array)))
 (define-rule array-item (:and (:maybe #'spaces)
                               (:many #'literals)
                               (:maybe #'spaces))
@@ -134,23 +121,36 @@
              :apply (lambda (a values b)
                       (declare (ignore a b))
                       `(:array ,values)))
+(define-rule empty-array (:and (:char #\[)
+                               (:maybe #'spaces)
+                               (:char #\]))
+             :call (lambda (x)
+                     (declare (ignore x))
+                     '(:array)))
 (define-rule array-literal (:or #'empty-array
                                 #'filled-array))
 
 (define-grammar json
-  boolean-literal := (:or (:string "true")
-                          (:string "false")) :call (lambda (value)
-                                                     (cons :boolean (stringify value)))
+    string-literal := (:between (:char #\")
+                                (:many (:or #'escaped-char
+                                            (:one #'alpha-char-p)))) :apply (lambda (a str b)
+                                                                              (declare (ignore a b))
+                                                                              (cons :string (stringify str)))
 
-  null-literal := (:string "null") :tag :null
 
-  literals := (:or #'array-literal
-                   #'object-literal
-                   #'string-literal
-                   #'number-literal
-                   #'boolean-literal
-                   #'null-literal)
-  )
+    boolean-literal := (:or (:string "true")
+                            (:string "false")) :call (lambda (value)
+                                                       (cons :boolean (stringify value)))
+
+    null-literal := (:string "null") :tag :null
+
+    literals := (:or #'array-literal
+                     #'object-literal
+                     #'string-literal
+                     #'number-literal
+                     #'boolean-literal
+                     #'null-literal)
+    )
 
 (format t
         "~%~%Parsing a simple json file:~%~%~a~%"
