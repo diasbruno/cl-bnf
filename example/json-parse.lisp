@@ -1,6 +1,5 @@
 (defpackage :cl-bnf-json-example
   (:use #:cl #:cl-bnf)
-  (:export #:run)
   (:import-from #:cl-bnf
                 #:define-rule
                 #:define-grammar))
@@ -141,16 +140,17 @@
 (define-grammar json
   boolean-literal := (:or (:string "true")
                           (:string "false")) :call (lambda (value)
-                          (cons :boolean (stringify value)))
+                                                     (cons :boolean (stringify value)))
 
   null-literal := (:string "null") :tag :null
 
-  json := (:or #'array-literal
-               #'object-literal
-               #'string-literal
-               #'number-literal
-               #'boolean-literal
-               #'null-literal))
+  literals := (:or #'array-literal
+                   #'object-literal
+                   #'string-literal
+                   #'number-literal
+                   #'boolean-literal
+                   #'null-literal)
+  )
 
 (format t
         "~%~%Parsing a simple json file:~%~%~a~%"

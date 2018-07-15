@@ -4,4 +4,5 @@
   :license "MIT"
   :depends-on (#:cl-bnf #:fiveam)
   :serial t
-  :components ((:file "tests")))
+  :components ((:module "t"
+                :components ((:file "tests")))))
