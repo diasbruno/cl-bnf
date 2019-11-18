@@ -6,8 +6,6 @@
 
 (in-package :cl-bnf)
 
-(defvar *table* nil)
-
 (defstruct text-stream
   cursor
   text
@@ -55,7 +53,7 @@
     (if (= (length string) (length result))
         (progn
           (back-char cp-stream)
-          (list :match cp-stream result))
+          (list :match cp-stream (concatenate 'string result)))
         (list :no-match stream))))
 
 (defun maybe-match (stream expression)
@@ -69,8 +67,7 @@
   "Many pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
          (result (loop
-                    :as item = (eval-pattern-or-function expression
-                                                         cp-stream)
+                    :as item = (eval-pattern-or-function expression cp-stream)
                     :while (equal :match (car item))
                     :collect (progn
                                (setf cp-stream (cadr item))
@@ -81,57 +78,109 @@
 
 (defun or-match (stream expression)
   "Or pattern to be run on STREAM with EXPRESSION."
-  (when (not (null expression))
-    (let* ((c (car expression))
-           (result (eval-pattern-or-function c stream)))
-      (if (equal :match (car result))
-          result
-          (or-match stream (cdr expression))))))
+  (if (null expression)
+      (list :no-match stream)
+      (let* ((c (car expression))
+             (result (eval-pattern-or-function c stream)))
+        (if (equal :match (car result))
+            result
+            (or-match stream (cdr expression))))))
 
 (defun and-match (stream expression)
   "And pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
          (result (block nil
                    (loop
-                      :for e :in expression
-                      :as item = (eval-pattern-or-function e cp-stream)
-                      :if (equal :match (car item))
-                      :collect (progn
-                                 (setf cp-stream (cadr item))
-                                 (caddr item))
-                      :else :do (return nil)))))
+                     :for e :in expression
+                     :as item = (eval-pattern-or-function e cp-stream)
+                     :if (equal :match (car item))
+                       :collect (progn
+                                  (setf cp-stream (cadr item))
+                                  (caddr item))
+                     :else :do (return nil)))))
     (if result
         (list :match cp-stream result)
         (list :no-match stream))))
 
 (defun eval-pattern-or-function (item source)
   "Evaluate a patter or function for ITEM an use SOURCE."
-  (if (eql (type-of item) 'function)
-      (funcall item source)
-      (case (car item)
-        ('function (funcall (cadr item) source))
-        (:char (single-char source (cadr item)))
-        (:one (one source (cadr (cadr item))))
-        (:string (string-match source (cadr item)))
-        (:maybe (maybe-match source (cadr item)))
-        (:many (many-matches source (cadr item)))
-        (:and (and-match source (cdr item)))
-        (:or (or-match source (cdr item))))))
+  (case (type-of item)
+    (symbol (funcall item source))
+    (t (case (car item)
+         (:char (single-char source (cdr item)))
+         (:string (string-match source (cdr item)))
+         (:maybe (maybe-match source (cdr item)))
+         (:many (many-matches source (cdr item)))
+         (:and (and-match source (cdr item)))
+         (:or (or-match source (cdr item)))
+         (t (one source (cadr item)))))))
 
 (defmacro define-rule (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
   `(defun ,label (source)
-     (let ((result (eval-pattern-or-function ',rule source)))
-       (if (equal :match (car result))
-           (list :match (cadr result)
-                 ,(cond
-                    (call `(funcall ,call (nth 2 result)))
-                    (apply `(apply ,apply (nth 2 result)))
-                    (tag `(cons ,tag (nth 2 result)))
-                    (t `(nth 2 result))))
-           result))))
+         (let ((result (eval-pattern-or-function ',rule source)))
+           (if (equal :match (car result))
+               (list :match (cadr result)
+                     ,(cond
+                        (call `(funcall ,call (nth 2 result)))
+                        (apply `(apply ,apply (nth 2 result)))
+                        (tag `(cons ,tag (nth 2 result)))
+                        (t `(nth 2 result))))
+               result))))
+
+(defun map-rules (fn rules)
+  (let ((index 0)
+        (l (length rules))
+        (rs nil))
+    (do ((h (sequence:position := rules :start index)
+            (sequence:position := rules :start index)))
+        ((>= index l))
+      (let* ((n (sequence:position := rules :start (1+ h)))
+             (ss (subseq rules (- h 1) (or (and n (- n 1)) l))))
+        (progn
+          (push (funcall fn ss) rs)
+          (setq index (or (and n (- n 1)) l)))))
+    (values rs)))
+
+(defun split-seq-on (item seq)
+  (let ((index 0)
+        (l (length seq))
+        (rs nil))
+    (do ((h (sequence:position item seq :start index)
+            (sequence:position item seq :start index)))
+        ((not h))
+      (progn
+        (setf rs (concatenate 'list rs (list (subseq seq index h))))
+        (setq index (1+ h))))
+    (append rs (list (subseq seq index l)))))
+
+(defun process-rule (rules)
+  (cons :or
+        (mapcar (lambda (items)
+               (loop :for item :in items
+                     :collect (etypecase item
+                                (standard-char (cons :char item))
+                                (string (cons :string item))
+                                (t item))))
+             rules)))
+
+(defmacro define-grammar (label &rest rules)
+  `(eval-when (:compile-toplevel)
+     ,@(map-rules (lambda (r)
+                    (let* ((label (car r))
+                           (rule-transform (split-seq-on :on (cddr r)))
+                           (rule (split-seq-on :/ (car rule-transform)))
+                           (transform (caadr rule-transform))
+                           (pr (process-rule
+                                (mapcar (lambda (r)
+                                          (cons :and r))
+                                        rule))))
+                      `(define-rule ,label ,pr
+                         :apply ,transform)))
+                  rules)
+     (defun ,label nil nil)))
 
 (defun parse (rules source)
   "Parse according to the RULES on SOURCE."
@@ -142,50 +191,3 @@ or a keytword."
                                   :length (length source))))
     (let ((result (funcall rules stream)))
       (caddr result))))
-
-(defmacro define-grammar (label &rest rules)
-  (if rules
-      (let* ((transform (nth 3 rules))
-             (has-transform (and transform (keywordp transform)))
-             (slice (if has-transform 5 3)))
-        (progn
-          (if has-transform
-              (let ((transform-value (nth 4 rules)))
-                (cond
-                  ((not (member transform '(:tag :call :apply)))
-                   (error (format NIL
-                                  "Tranform kind must be one of :tag, :call or :apply~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
-                                  (car rules)
-                                  (nth 2 rules)
-                                  transform
-                                  transform-value)))
-                  ((and (not (eq :tag transform))
-                        (not (or (functionp transform-value)
-                                 (and (consp transform-value)
-                                      (eq 'lambda (car transform-value))))))
-                   (error (format NIL
-                                  "Tranform must be a function~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
-                                  (car rules)
-                                  (nth 2 rules)
-                                  transform
-                                  transform-value)))
-                  ((and (eq :tag transform)
-                        (or (functionp transform-value)
-                            (not (keywordp transform-value))))
-                   (error (format NIL
-                                  ":tag must be a symbol~%~%in~%~%~t ~a := ~a :~a ~a~%~%"
-                                  (car rules)
-                                  (nth 2 rules)
-                                  transform
-                                  transform-value)))
-                  (t (push (macroexpand `(define-rule ,(car rules) ,(nth 2 rules)
-                                           ,transform ,transform-value)) *table*))))
-
-              (push (macroexpand `(define-rule ,(car rules) ,(nth 2 rules))) *table*))
-          (when (>= (length rules) slice)
-            (macroexpand `(define-grammar ,label
-                              ,@(subseq rules slice))))))
-      `(block nil (let ((table *table*))
-                    (progn
-                      (setf *table* nil)
-                      ,@*table*)))))
