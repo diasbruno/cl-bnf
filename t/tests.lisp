@@ -16,21 +16,19 @@
     (:char . #\a))
 
 (define-rule many-a
-    (:many . (:char . #\a)))
+    (:* . (:char . #\a)))
 
 (define-rule wording
-    (:many . single-character))
+    (:* . single-character))
 
 (define-rule letter-or-num
-    (:or #'alpha-char-p
-         #'numeric-char-p))
+    (:or #'alpha-char-p #'numeric-char-p))
 
 (define-rule letter-num
-    (:and #'alpha-char-p
-          #'numeric-char-p))
+    (:and #'alpha-char-p #'numeric-char-p))
 
 (define-rule identifier
-    (:many . single-character)
+    (:* . single-character)
   :call (lambda (x)
           (cons :identifier (coerce x 'string))))
 
@@ -38,25 +36,24 @@
     (:string . "abc"))
 
 (define-rule repeat-abc
-    (:many . abc))
+    (:* . abc))
 
 (define-rule repeat-abc2
-    (:many . (:or (:and abc
-                        (:many . (:char . #\space)))
-                  abc)))
+    (:* . (:or (:and abc
+                     (:* . (:char . #\space)))
+               abc)))
 
 (define-rule spaces
-    (:many . (:char . #\space)))
+    (:* . (:char . #\space)))
 
 (define-rule number-literal
-    (:many . #'numeric-char-p)
+    (:* . #'numeric-char-p)
   :call (lambda (value)
           (cons :number (coerce value 'string))))
 
 (define-grammar language
   kv := identifier "-" number-literal
-  :on (lambda (lhs dash expr)
-        (list :assignment lhs expr)))
+  :on (lambda (v) (list :assignment (car v) (caddr v))))
 
 (5am:def-test test-single-char (:suite test-suite)
   (5am:is (char-equal (parse #'single-character "a") #\a)))

@@ -7,11 +7,7 @@
 (in-package :cl-bnf)
 
 (defstruct text-stream
-  cursor
-  text
-  line
-  column
-  length)
+  cursor text line column length)
 
 (defun next-char (ts &key eof-char)
   "Look ahead the next char."
@@ -42,20 +38,24 @@
          (list :match cpy-stream current)
          (list :no-match ,stream))))
 
-(defun string-match (stream string)
+(declaim (optimize (debug 3)))
+(defun string-match (stream str)
   "String pattern to be run on STREAM with STRING."
   (let* ((cp-stream (copy-text-stream stream))
          (result (loop
                    :for c = (next-char cp-stream :eof-char :eof)
-                   :for d :in (coerce string 'list)
-                   :if (and (not (equal :eof c)) (char-equal c d))
+                   :for d :in (coerce str 'list)
+                   :if (and (not (equal :eof c))
+                            (char-equal c d))
                      :collect c)))
-    (if (= (length string) (length result))
+    (if (= (length str)
+           (length result))
         (progn
           (back-char cp-stream)
           (list :match cp-stream (concatenate 'string result)))
         (list :no-match stream))))
 
+(declaim (optimize (debug 3)))
 (defun maybe-match (stream expression)
   "Maybe pattern to be run on STREAM with EXPRESSION."
   (let ((result (eval-pattern-or-function expression stream)))
@@ -63,6 +63,7 @@
         (list :match (cadr result) nil)
         result)))
 
+(declaim (optimize (debug 3)))
 (defun many-matches (stream expression)
   "Many pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
@@ -76,6 +77,7 @@
         (list :match cp-stream result)
         (list :no-match stream))))
 
+(declaim (optimize (debug 3)))
 (defun or-match (stream expression)
   "Or pattern to be run on STREAM with EXPRESSION."
   (if (null expression)
@@ -86,6 +88,7 @@
             result
             (or-match stream (cdr expression))))))
 
+(declaim (optimize (debug 3)))
 (defun and-match (stream expression)
   "And pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
@@ -102,18 +105,29 @@
         (list :match cp-stream result)
         (list :no-match stream))))
 
+(defun ispair (x)
+  (and (eql (type-of x) 'cons)
+       (cdr x)
+       (not (eql (type-of (cdr x)) 'cons))))
+
+(declaim (optimize (debug 3)))
 (defun eval-pattern-or-function (item source)
   "Evaluate a patter or function for ITEM an use SOURCE."
-  (case (type-of item)
-    (symbol (funcall item source))
-    (t (case (car item)
-         (:char (single-char source (cdr item)))
-         (:string (string-match source (cdr item)))
-         (:maybe (maybe-match source (cdr item)))
-         (:many (many-matches source (cdr item)))
-         (:and (and-match source (cdr item)))
-         (:or (or-match source (cdr item)))
-         (t (one source (cadr item)))))))
+  (if (and (eql (type-of item) 'cons)
+           (or (ispair item)
+               (eql (type-of (car item)) 'keyword)))
+      (let ((r (case (car item)
+                 (:char (single-char source (cdr item)))
+                 (:string (string-match source (cdr item)))
+                 (:? (maybe-match source (cdr item)))
+                 (:* (many-matches source (cdr item)))
+                 (:and (and-match source (cdr item)))
+                 (:or (or-match source (cdr item)))
+                 (t (error "meh")))))
+        r)
+      (typecase item
+        (cons (one source (cadr item)))
+        (symbol (funcall item source)))))
 
 (defmacro define-rule (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
@@ -131,9 +145,7 @@ or a keytword."
            result))))
 
 (defun map-rules (fn rules)
-  (let ((index 0)
-        (l (length rules))
-        (rs nil))
+  (let ((index 0) (l (length rules)) (rs nil))
     (do ((h (sequence:position := rules :start index)
             (sequence:position := rules :start index)))
         ((>= index l))
@@ -145,9 +157,7 @@ or a keytword."
     (values rs)))
 
 (defun split-seq-on (item seq)
-  (let ((index 0)
-        (l (length seq))
-        (rs nil))
+  (let ((index 0) (l (length seq)) (rs nil))
     (do ((h (sequence:position item seq :start index)
             (sequence:position item seq :start index)))
         ((not h))
@@ -156,38 +166,50 @@ or a keytword."
         (setq index (1+ h))))
     (append rs (list (subseq seq index l)))))
 
-(defun process-rule (rules)
-  (cons :or
-        (mapcar (lambda (items)
-                  (loop :for item :in items
-                        :collect (etypecase item
-                                   (standard-char (cons :char item))
-                                   (string (cons :string item))
-                                   (t item))))
-                rules)))
+(defun expand-item (item)
+  (etypecase item
+    (standard-char (cons :char item))
+    (base-char (cons :char item))
+    (string (cons :string item))
+    (symbol item)
+    (function item)
+    (t (if (or (ispair item)
+               (eql (type-of (cadr item)) 'keyword))
+           (cons (car item) (expand-item (cdr item)))
+           (mapcar #'expand-item item)))))
+
+(defun expand-and-rule (items)
+  "Take many or RULES and normalize the tree."
+  (let ((e (expand-item items)))
+    (if (> (length items) 1)
+        (cons :and e)
+        (car e))))
 
 (defmacro define-grammar (label &rest rules)
   `(eval-when (:compile-toplevel)
      ,@(map-rules (lambda (r)
                     (let* ((label (car r))
+                           ;; rule transform => (rule, trasform)
                            (rule-transform (split-seq-on :on (cddr r)))
+                           ;; or cases => rule :: [[r] [r]]
                            (rule (split-seq-on :/ (car rule-transform)))
+                           ;; trasform :: args -> a
                            (transform (caadr rule-transform))
-                           (pr (process-rule
-                                (mapcar (lambda (r)
-                                          (cons :and r))
-                                        rule))))
-                      `(define-rule ,label ,pr
-                         :apply ,transform)))
+                           (pr (let ((ex (mapcar #'expand-and-rule rule)))
+                                 (if (> (length ex) 1)
+                                     (cons :or ex)
+                                     (car ex)))))
+                      `(define-rule ,label ,pr :call ,transform)))
                   rules)
      (defun ,label nil nil)))
 
+(declaim (optimize (debug 3)))
 (defun parse (rules source)
   "Parse according to the RULES on SOURCE."
-  (let ((stream (make-text-stream :cursor 0
-                                  :text source
-                                  :line 0
-                                  :column 0
-                                  :length (length source))))
+  (let* ((stream (make-text-stream :cursor 0
+                                   :text source
+                                   :line 0
+                                   :column 0
+                                   :length (length source))))
     (let ((result (funcall rules stream)))
       (caddr result))))
