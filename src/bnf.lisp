@@ -46,10 +46,10 @@
   "String pattern to be run on STREAM with STRING."
   (let* ((cp-stream (copy-text-stream stream))
          (result (loop
-                    :for c = (next-char cp-stream :eof-char :eof)
-                    :for d :in (coerce string 'list)
-                    :if (and (not (equal :eof c)) (char-equal c d))
-                    :collect c)))
+                   :for c = (next-char cp-stream :eof-char :eof)
+                   :for d :in (coerce string 'list)
+                   :if (and (not (equal :eof c)) (char-equal c d))
+                     :collect c)))
     (if (= (length string) (length result))
         (progn
           (back-char cp-stream)
@@ -67,11 +67,11 @@
   "Many pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
          (result (loop
-                    :as item = (eval-pattern-or-function expression cp-stream)
-                    :while (equal :match (car item))
-                    :collect (progn
-                               (setf cp-stream (cadr item))
-                               (caddr item)))))
+                   :as item = (eval-pattern-or-function expression cp-stream)
+                   :while (equal :match (car item))
+                   :collect (progn
+                              (setf cp-stream (cadr item))
+                              (caddr item)))))
     (if (> (length result) 0)
         (list :match cp-stream result)
         (list :no-match stream))))
@@ -120,15 +120,15 @@
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
   `(defun ,label (source)
-         (let ((result (eval-pattern-or-function ',rule source)))
-           (if (equal :match (car result))
-               (list :match (cadr result)
-                     ,(cond
-                        (call `(funcall ,call (nth 2 result)))
-                        (apply `(apply ,apply (nth 2 result)))
-                        (tag `(cons ,tag (nth 2 result)))
-                        (t `(nth 2 result))))
-               result))))
+     (let ((result (eval-pattern-or-function ',rule source)))
+       (if (equal :match (car result))
+           (list :match (cadr result)
+                 ,(cond
+                    (call `(funcall ,call (nth 2 result)))
+                    (apply `(apply ,apply (nth 2 result)))
+                    (tag `(cons ,tag (nth 2 result)))
+                    (t `(nth 2 result))))
+           result))))
 
 (defun map-rules (fn rules)
   (let ((index 0)
@@ -159,12 +159,12 @@ or a keytword."
 (defun process-rule (rules)
   (cons :or
         (mapcar (lambda (items)
-               (loop :for item :in items
-                     :collect (etypecase item
-                                (standard-char (cons :char item))
-                                (string (cons :string item))
-                                (t item))))
-             rules)))
+                  (loop :for item :in items
+                        :collect (etypecase item
+                                   (standard-char (cons :char item))
+                                   (string (cons :string item))
+                                   (t item))))
+                rules)))
 
 (defmacro define-grammar (label &rest rules)
   `(eval-when (:compile-toplevel)

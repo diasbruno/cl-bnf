@@ -6,11 +6,11 @@
 (in-package :cl-bnf-tests)
 
 (5am:def-suite test-suite
-    :description "Suite for tests which should fail.")
+  :description "Suite for tests which should fail.")
 
 (defun numeric-char-p (char)
-    (and (char-not-lessp char #\0)
-         (char-not-greaterp char #\9)))
+  (and (char-not-lessp char #\0)
+       (char-not-greaterp char #\9)))
 
 (define-rule single-character
     (:char . #\a))
@@ -89,5 +89,4 @@
 
 (5am:def-test test-assignment (:suite test-suite)
   (5am:is (equal (parse #'kv "a-1")
-                 '(:assignment (:identifier . "a")
-                   (:number . "1")))))
+                 '(:assignment (:identifier . "a") (:number . "1")))))
