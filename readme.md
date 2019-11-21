@@ -2,55 +2,67 @@
 
 A simple BNF.
 
-## tokens & terms
+`(:char . #\a)`     matches the given char.
 
-- `(:char #\a)` test the next element on the stream with the given char.
-- `(:one #'fn)` test using a function to get the next char in the stream.
-- `(:string "abc")` test if the string is in the stream.
-- `(:and exp ...)` collect many expressions.
-- `(:or exp ...)` collect the expression that matches.
-- `(:many exp)` collect all matches of the expression, if any.
-- `(:maybe exp)` turns the failed test into a valid one.
+`(:string . "abc")` matches the given string.
+
+`(:and exp ...)`  all expressions must match.
+
+`(:or exp ...)`   returns the first expression that matches.
+
+`(:* . exp)`        collect all strings matches the expression, if any.
+
+`(:? . exp)`        optional match.
+
+`#'my-function`   execute the function with the current char.
+
+Characters and strings don't need to be a pair with their respective keywords
+if you are writing a grammar.
+
+`and` can also be written in a form of sequence `rule-c := rule-a rule-b`.
+
+`or` can also be written using `:/`, for example: `rule-c := rule-a :/ rule-b`.
+
+Note that only the `:and` and `:or` are the only matchers
+that aren't dotted.
 
 ## rules & grammars
 
 You can define a single rule using `define-rule`
 
 ```lisp
-(define-rule word (:many (:one #'alpha-char-p)) :call #'stringify)
+(define-rule word (:* . #'alpha-char-p) :call #'stringify)
 ```
 
 ...or using the `define-grammar`
 
 ```lisp
 (define-grammar json-number
-   decimal-number := (:many (:one #'numeric-char-p))
+   decimal-number := (:* . #'numeric-char-p)
+   ;;     using a function ^
 
-   real-number := (:or (:and #'decimal-number
-                             (:char #\.)
-                             #'decimal-number)
-                       (:and #'decimal-number
-                             (:char #\.)))
+   dotted-decimal := decimal-number #\.
+   ;;            and ^
 
-   signed-part := (:or (:char #\+) (:char #\-))
+   real-number := dotted-decimal decimal-number :/ dotted-decimal
+   ;;                                        or ^
 
-   exp-chars := (:or (:char #\e) (:char #\E))
+   signed-part := #\+ :/ #\-
 
-   exp-part := (:and #'exp-chars
-                     #'signed-part
-                     (:maybe #'decimal-number))
+   exp-chars := #\e :/ #\E
 
-   numeric := (:or #'real-number #'decimal-number))
+   exp-part := exp-chars signed-part (:? . decimal-number)
 
-   number-literal := (:or (:and #'numeric
-                                #'exp-part)
-                          #'numeric) :call (lambda (matches)
-                                             (cons :number (stringify matches)))
+   numeric := real-number :/ decimal-number
+
+   number-literal := numeric exp-part :/ numeric
+   :on (lambda (matches)
+         (cons :number (stringify matches)))
 
 (parse #number-literal "1e3")
 ```
 
-#### Using transformations:
+#### transformations
 
 - `:call` apply a function to the results using `funcall`.
 - `:apply` apply a function to the results using `apply`.
