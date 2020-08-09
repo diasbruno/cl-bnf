@@ -86,7 +86,6 @@
   literals := array-literal :/ object-literal :/ string-literal :/
               number-literal :/ boolean-literal :/ null-literal)
 
-(print "results:")
 (let ((strs (list
         "null"
         "true"

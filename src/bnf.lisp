@@ -146,10 +146,10 @@ or a keytword."
 
 (defun map-rules (fn rules)
   (let ((index 0) (l (length rules)) (rs nil))
-    (do ((h (sequence:position := rules :start index)
-            (sequence:position := rules :start index)))
+    (do ((h (position := rules :start index)
+            (position := rules :start index)))
         ((>= index l))
-      (let* ((n (sequence:position := rules :start (1+ h)))
+      (let* ((n (position := rules :start (1+ h)))
              (ss (subseq rules (- h 1) (or (and n (- n 1)) l))))
         (progn
           (push (funcall fn ss) rs)
@@ -158,8 +158,8 @@ or a keytword."
 
 (defun split-seq-on (item seq)
   (let ((index 0) (l (length seq)) (rs nil))
-    (do ((h (sequence:position item seq :start index)
-            (sequence:position item seq :start index)))
+    (do ((h (position item seq :start index)
+            (position item seq :start index)))
         ((not h))
       (progn
         (setf rs (concatenate 'list rs (list (subseq seq index h))))
