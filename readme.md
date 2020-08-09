@@ -6,25 +6,19 @@ A simple BNF.
 
 `(:string . "abc")` matches the given string.
 
-`(:and exp ...)`  all expressions must match.
+`(:and exp ...)`    all expressions must match.
 
-`(:or exp ...)`   returns the first expression that matches.
+`(:or exp ...)`     returns the first expression that matches.
 
 `(:* . exp)`        collect all strings matches the expression, if any.
 
 `(:? . exp)`        optional match.
 
-`#'my-function`   execute the function with the current char.
-
-Characters and strings don't need to be a pair with their respective keywords
-if you are writing a grammar.
+`#'my-function`     execute the function with the current char.
 
 `and` can also be written in a form of sequence `rule-c := rule-a rule-b`.
 
 `or` can also be written using `:/`, for example: `rule-c := rule-a :/ rule-b`.
-
-Note that only the `:and` and `:or` are the only matchers
-that aren't dotted.
 
 ## rules & grammars
 
@@ -37,7 +31,7 @@ You can define a single rule using `define-rule`
 ...or using the `define-grammar`
 
 ```lisp
-(define-grammar json-number
+(define-grammar (json-number . number-literal)
    decimal-number := (:* . #'numeric-char-p)
    ;;     using a function ^
 
@@ -59,7 +53,7 @@ You can define a single rule using `define-rule`
    :on (lambda (matches)
          (cons :number (stringify matches)))
 
-(parse #number-literal "1e3")
+(json-number "1e3")
 ```
 
 #### transformations
@@ -67,7 +61,7 @@ You can define a single rule using `define-rule`
 - `:call` apply a function to the results using `funcall`.
 - `:apply` apply a function to the results using `apply`.
 - `:tag` return a cons like `(cons TAG RESULTS)`.
-- If none where specified, it return a list of all matches.
+- If none where specified, it return all matches.
 
 ## License
 

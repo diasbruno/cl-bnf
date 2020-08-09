@@ -25,7 +25,7 @@
   (and (char-not-lessp char #\0)
        (char-not-greaterp char #\9)))
 
-(define-grammar json
+(define-grammar (json . literals)
 
   null-literal := "null"
   :on (lambda (v) (declare (ignore v)) :null)
@@ -84,24 +84,28 @@
         (list :object (nth 2 v)))
 
   literals := array-literal :/ object-literal :/ string-literal :/
-  number-literal :/ boolean-literal :/ null-literal)
+              number-literal :/ boolean-literal :/ null-literal)
 
 (print "results:")
-(parse #'literals "null")
-(parse #'boolean-literal "true")
-(parse #'literals "1.0E+2")
-(parse #'literals "[]")
-(parse #'literals "[1,2]")
-(parse #'literals "[ 1,2]")
-(parse #'literals "[ 1 ,2]")
-(parse #'literals "[ 1 , 2]")
-(parse #'literals "[ 1 , 2 ]")
-(parse #'literals "[ 1, 2 ]")
-(parse #'literals "[1, 2 ]")
-(parse #'literals "[1, 2 ,3 ]")
-(parse #'literals "[1,]")
-(parse #'literals "{}")
-(parse #'literals "{\"a\":1}")
-(parse #'literals "{  \"a\"  :  1  , \"b\"  :  2   }")
-(parse #'literals "{\"a\"}")
-(parse #'literals "{\"a\":}")
+(let ((strs (list
+        "null"
+        "true"
+        "1.0E+2"
+        "[]"
+        "[1,2]"
+        "[ 1,2]"
+        "[ 1 ,2]"
+        "[ 1 , 2]"
+        "[ 1 , 2 ]"
+        "[ 1, 2 ]"
+        "[1, 2 ]"
+        "[1, 2 ,3 ]"
+        "[1,]"
+        "{}"
+        "{\"a\":1}"
+        "{  \"a\"  :  1  , \"b\"  :  2   }"
+        "{\"a\"}"
+        "{\"a\":}"
+        )))
+  (dolist (str strs)
+    (format t "result: ~A~%" (json str))))

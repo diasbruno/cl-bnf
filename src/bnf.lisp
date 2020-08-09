@@ -185,8 +185,19 @@ or a keytword."
         (cons :and e)
         (car e))))
 
-(defmacro define-grammar (label &rest rules)
-  `(eval-when (:compile-toplevel)
+(declaim (optimize (debug 3)))
+(defun parse (rules source)
+  "Parse according to the RULES on SOURCE."
+  (let* ((stream (make-text-stream :cursor 0
+                                   :text source
+                                   :line 0
+                                   :column 0
+                                   :length (length source))))
+    (let ((result (funcall rules stream)))
+      (caddr result))))
+
+(defmacro define-grammar (spec &rest rules)
+  `(progn
      ,@(map-rules (lambda (r)
                     (let* ((label (car r))
                            ;; rule transform => (rule, trasform)
@@ -201,15 +212,5 @@ or a keytword."
                                      (car ex)))))
                       `(define-rule ,label ,pr :call ,transform)))
                   rules)
-     (defun ,label nil nil)))
-
-(declaim (optimize (debug 3)))
-(defun parse (rules source)
-  "Parse according to the RULES on SOURCE."
-  (let* ((stream (make-text-stream :cursor 0
-                                   :text source
-                                   :line 0
-                                   :column 0
-                                   :length (length source))))
-    (let ((result (funcall rules stream)))
-      (caddr result))))
+     (defun ,(car spec) (stream)
+       (parse (function ,(cdr spec)) stream))))

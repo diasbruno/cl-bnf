@@ -51,7 +51,7 @@
   :call (lambda (value)
           (cons :number (coerce value 'string))))
 
-(define-grammar language
+(define-grammar (language . kv)
   kv := identifier "-" number-literal
   :on (lambda (v) (list :assignment (car v) (caddr v))))
 
