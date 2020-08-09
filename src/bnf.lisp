@@ -38,7 +38,6 @@
          (list :match cpy-stream current)
          (list :no-match ,stream))))
 
-(declaim (optimize (debug 3)))
 (defun string-match (stream str)
   "String pattern to be run on STREAM with STRING."
   (let* ((cp-stream (copy-text-stream stream))
@@ -55,7 +54,6 @@
           (list :match cp-stream (concatenate 'string result)))
         (list :no-match stream))))
 
-(declaim (optimize (debug 3)))
 (defun maybe-match (stream expression)
   "Maybe pattern to be run on STREAM with EXPRESSION."
   (let ((result (eval-pattern-or-function expression stream)))
@@ -63,7 +61,6 @@
         (list :match (cadr result) nil)
         result)))
 
-(declaim (optimize (debug 3)))
 (defun many-matches (stream expression)
   "Many pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
@@ -77,7 +74,6 @@
         (list :match cp-stream result)
         (list :no-match stream))))
 
-(declaim (optimize (debug 3)))
 (defun or-match (stream expression)
   "Or pattern to be run on STREAM with EXPRESSION."
   (if (null expression)
@@ -88,7 +84,6 @@
             result
             (or-match stream (cdr expression))))))
 
-(declaim (optimize (debug 3)))
 (defun and-match (stream expression)
   "And pattern to be run on STREAM with EXPRESSION."
   (let* ((cp-stream stream)
@@ -110,7 +105,6 @@
        (cdr x)
        (not (eql (type-of (cdr x)) 'cons))))
 
-(declaim (optimize (debug 3)))
 (defun eval-pattern-or-function (item source)
   "Evaluate a patter or function for ITEM an use SOURCE."
   (if (and (eql (type-of item) 'cons)
@@ -145,6 +139,7 @@ or a keytword."
            result))))
 
 (defun map-rules (fn rules)
+  "Apply FN on each expression in RULES."
   (let ((index 0) (l (length rules)) (rs nil))
     (do ((h (position := rules :start index)
             (position := rules :start index)))
@@ -157,6 +152,7 @@ or a keytword."
     (values rs)))
 
 (defun split-seq-on (item seq)
+  "Split on ITEM on SEQ."
   (let ((index 0) (l (length seq)) (rs nil))
     (do ((h (position item seq :start index)
             (position item seq :start index)))
@@ -167,6 +163,7 @@ or a keytword."
     (append rs (list (subseq seq index l)))))
 
 (defun expand-item (item)
+  "If ITEM is simple type, transforms it into the correct structure."
   (etypecase item
     (standard-char (cons :char item))
     (base-char (cons :char item))
@@ -185,7 +182,6 @@ or a keytword."
         (cons :and e)
         (car e))))
 
-(declaim (optimize (debug 3)))
 (defun parse (rules source)
   "Parse according to the RULES on SOURCE."
   (let* ((stream (make-text-stream :cursor 0
@@ -197,6 +193,7 @@ or a keytword."
       (caddr result))))
 
 (defmacro define-grammar (spec &rest rules)
+  "Generates the parser with SPEC and all the RULES."
   `(progn
      ,@(map-rules (lambda (r)
                     (let* ((label (car r))
