@@ -5,4 +5,8 @@
   :depends-on (#:cl-bnf #:fiveam)
   :serial t
   :components ((:module "t"
-                :components ((:file "tests")))))
+                :components ((:file "package")
+                             (:file "common")
+                             (:file "modifiers")
+                             (:file "rules")
+                             (:file "grammar")))))
