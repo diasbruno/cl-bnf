@@ -1,4 +1,7 @@
-# cl-bnf [![Build Status](https://travis-ci.org/diasbruno/jsc.svg?branch=master)](https://travis-ci.org/diasbruno/cl-bnf)
+# cl-bnf
+[![CI](https://github.com/diasbruno/cl-bnf/actions/workflows/ci.yml/badge.svg)](https://github.com/diasbruno/cl-bnf/actions/workflows/ci.yml)
+
+
 
 A simple BNF.
 
