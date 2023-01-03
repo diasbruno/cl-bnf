@@ -9,15 +9,20 @@
     (:or #'alpha-char-p #'numeric-char-p))
 
 (5am:def-test test-or-rule-with-function ()
-  (5am:is (and
-	   (char-equal (parse #'or-rule-with-function "1") #\1)
-	   (char-equal (parse #'or-rule-with-function "a") #\a)
-	   (equal (parse #'or-rule-with-function "-") nil))))
+  (let ((example1 (make-string-input-stream "1"))
+	(example2 (make-string-input-stream "a"))
+	(example3 (make-string-input-stream "-")))
+   (5am:is (and
+	    (char-equal (parse #'or-rule-with-function example1) #\1)
+	    (char-equal (parse #'or-rule-with-function example2) #\a)
+	    (equal (parse #'or-rule-with-function example3) nil)))))
 
 (define-rule and-rule-with-functions
     (:and #'alpha-char-p #'numeric-char-p))
 
 (5am:def-test test-and-rule-with-functions ()
-  (5am:is (and
-	   (equal (parse #'and-rule-with-functions "a1") '(#\a #\1))
-	   (equal (parse #'and-rule-with-functions "1b") nil))))
+  (let ((example1 (make-string-input-stream "a1"))
+	(example2 (make-string-input-stream "1b")))
+   (5am:is (and
+	    (equal (parse #'and-rule-with-functions example1) '(#\a #\1))
+	    (equal (parse #'and-rule-with-functions example2) nil)))))

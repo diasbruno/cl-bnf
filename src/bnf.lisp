@@ -2,57 +2,59 @@
   (:use #:cl)
   (:export #:parse
            #:define-rule
-           #:define-grammar))
+           #:define-grammar
+           #:string-match
+           #:single-char
+           #:maybe-match
+           #:many-matches
+           #:or-match
+           #:and-match
+           #:match-pred))
 
 (in-package :cl-bnf)
 
-(defstruct text-stream
-  cursor text line column length)
+(defmacro save-stream-position (body)
+  `(let ((stream-position (slot-value stream 'SB-INT:INDEX)))
+     ,body))
 
-(defun next-char (ts &key eof-char)
-  "Look ahead the next char."
-  (if (< (text-stream-cursor ts) (text-stream-length ts))
-      (prog1 (char (text-stream-text ts)
-                   (text-stream-cursor ts))
-        (incf (text-stream-cursor ts)))
-      eof-char))
+(defmacro consume-input (check success fail)
+  `(save-stream-position
+    (let ((current (read-char stream nil :eof)))
+      (if ,check
+          ,success
+          (progn
+            (setf (slot-value stream 'SB-INT:INDEX) stream-position)
+            ,fail)))))
 
-(defun back-char (ts)
-  "Move backward one char on TS."
-  (setf (text-stream-cursor ts)
-        (max (decf (text-stream-cursor ts)) 0)))
-
-(defmacro one (stream pred)
+(defun match-pred (stream pred)
   "Get a single char from the STREAM and test against PRED."
-  `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (next-char cpy-stream)))
-     (if (and current (funcall ,pred current))
-         (list :match cpy-stream current)
-         (list :no-match ,stream))))
+  (consume-input
+   (and (not (equal current :eof))
+        (funcall pred current))
+   (list :match stream current)
+   (list :no-match stream)))
 
 (defmacro single-char (stream char)
   "Get a single char from the STREAM and test against CHAR."
-  `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (next-char cpy-stream)))
-     (if (and current (char-equal ,char current))
-         (list :match cpy-stream current)
-         (list :no-match ,stream))))
+  `(match-pred ,stream #'(lambda (c) (char-equal ,char c))))
 
 (defun string-match (stream str)
   "String pattern to be run on STREAM with STRING."
-  (let* ((cp-stream (copy-text-stream stream))
-         (result (loop
-                   :for c = (next-char cp-stream :eof-char :eof)
+  (save-stream-position
+   (let ((result (loop
+                   :for c = (read-char stream nil :eof)
                    :for d :in (coerce str 'list)
                    :if (and (not (equal :eof c))
                             (char-equal c d))
                      :collect c)))
-    (if (= (length str)
-           (length result))
-        (progn
-          (back-char cp-stream)
-          (list :match cp-stream (concatenate 'string result)))
-        (list :no-match stream))))
+     (if (= (length str) (length result))
+         (progn
+           (setf (slot-value stream 'SB-INT:INDEX)
+                 (1- (slot-value stream 'SB-INT:INDEX)))
+           (list :match stream (concatenate 'string result)))
+         (progn
+           (setf (slot-value stream 'SB-INT:INDEX) stream-position)
+           (list :no-match stream))))))
 
 (defun maybe-match (stream expression)
   "Maybe pattern to be run on STREAM with EXPRESSION."
@@ -63,15 +65,12 @@
 
 (defun many-matches (stream expression)
   "Many pattern to be run on STREAM with EXPRESSION."
-  (let* ((cp-stream stream)
-         (result (loop
-                   :as item = (eval-pattern-or-function expression cp-stream)
-                   :while (equal :match (car item))
-                   :collect (progn
-                              (setf cp-stream (cadr item))
-                              (caddr item)))))
+  (let ((result (loop
+                  :as item = (eval-pattern-or-function expression stream)
+                  :while (equal :match (car item))
+                  :collect (caddr item))))
     (if (> (length result) 0)
-        (list :match cp-stream result)
+        (list :match stream result)
         (list :no-match stream))))
 
 (defun or-match (stream expression)
@@ -105,30 +104,33 @@
        (cdr x)
        (not (eql (type-of (cdr x)) 'cons))))
 
-(defun eval-pattern-or-function (item source)
-  "Evaluate a patter or function for ITEM an use SOURCE."
-  (if (and (eql (type-of item) 'cons)
-           (or (ispair item)
-               (eql (type-of (car item)) 'keyword)))
-      (let ((r (case (car item)
-                 (:char (single-char source (cdr item)))
-                 (:string (string-match source (cdr item)))
-                 (:? (maybe-match source (cdr item)))
-                 (:* (many-matches source (cdr item)))
-                 (:and (and-match source (cdr item)))
-                 (:or (or-match source (cdr item)))
-                 (t (error "meh")))))
-        r)
+(defun evaluatable (item)
+  "Check if ITEM is ready to be evaluated."
+  (and (eql (type-of item) 'cons)
+       (or (ispair item)
+           (eql (type-of (car item)) 'keyword))))
+
+(defun eval-pattern-or-function (item stream)
+  "Evaluate a pattern or function for ITEM an use STREAM."
+  (if (evaluatable item)
+      (case (car item)
+        (:char (single-char stream (cdr item)))
+        (:string (string-match stream (cdr item)))
+        (:? (maybe-match stream (cdr item)))
+        (:* (many-matches stream (cdr item)))
+        (:and (and-match stream (cdr item)))
+        (:or (or-match stream (cdr item)))
+        (t (error "meh")))
       (typecase item
-        (cons (one source (cadr item)))
-        (symbol (funcall item source)))))
+        (cons (match-pred stream (cadr item)))
+        (symbol (funcall item stream)))))
 
 (defmacro define-rule (label rule &key call tag apply)
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
-  `(defun ,label (source)
-     (let ((result (eval-pattern-or-function ',rule source)))
+  `(defun ,label (stream)
+     (let ((result (eval-pattern-or-function ',rule stream)))
        (if (equal :match (car result))
            (list :match (cadr result)
                  ,(cond
@@ -182,15 +184,9 @@ or a keytword."
         (cons :and e)
         (car e))))
 
-(defun parse (rules source)
-  "Parse according to the RULES on SOURCE."
-  (let* ((stream (make-text-stream :cursor 0
-                                   :text source
-                                   :line 0
-                                   :column 0
-                                   :length (length source))))
-    (let ((result (funcall rules stream)))
-      (caddr result))))
+(defun parse (rules stream)
+  "Parse according to the RULES on STREAM."
+  (caddr (funcall rules stream)))
 
 (defmacro define-grammar (spec &rest rules)
   "Generates the parser with SPEC and all the RULES."

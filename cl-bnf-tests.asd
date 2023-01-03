@@ -7,6 +7,7 @@
   :components ((:module "t"
                 :components ((:file "package")
                              (:file "common")
+                             (:file "matchers")
                              (:file "modifiers")
                              (:file "rules")
                              (:file "grammar")))))
