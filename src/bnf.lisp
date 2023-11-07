@@ -6,53 +6,33 @@
 
 (in-package :cl-bnf)
 
-(defstruct text-stream
-  cursor text line column length)
-
-(defun stream-read-char (ts &key eof-char)
-  "Look ahead the next char."
-  (if (< (text-stream-cursor ts) (text-stream-length ts))
-      (prog1 (char (text-stream-text ts)
-                   (text-stream-cursor ts))
-        (incf (text-stream-cursor ts)))
-      eof-char))
-
-(defun stream-peek-char (ts &key eof-char)
-  "Look ahead the next char."
-  (if (< (text-stream-cursor ts) (text-stream-length ts))
-      (char (text-stream-text ts)
-            (text-stream-cursor ts))
-      eof-char))
-
 (defmacro one (stream pred)
   "Get a single char from the STREAM and test against PRED."
-  `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (stream-read-char cpy-stream)))
-     (if (and current (funcall ,pred current))
-         (list :match cpy-stream current)
+  `(let* ((current (peek-char nil ,stream nil :eof)))
+     (if (and (not (equal :eof current)) (funcall ,pred current))
+         (prog1 (list :match ,stream current)
+           (read-char ,stream nil nil))
          (list :no-match ,stream))))
 
 (defmacro single-char (stream char)
   "Get a single char from the STREAM and test against CHAR."
-  `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (stream-read-char cpy-stream)))
-     (if (and current (char-equal ,char current))
-         (list :match cpy-stream current)
+  `(let* ((current (peek-char nil ,stream nil :eof)))
+     (if (and (not (equal :eof current)) (char-equal ,char current))
+         (prog1 (list :match ,stream current)
+           (read-char ,stream nil nil))
          (list :no-match ,stream))))
 
 (defun string-match (stream str)
   "String pattern to be run on STREAM with STRING."
-  (let* ((cp-stream (copy-text-stream stream))
-         (result (loop
-                   :for c = (stream-peek-char cp-stream :eof-char :eof)
-                   :for d :in (coerce str 'list)
-                   :if (and (not (equal :eof c))
-                            (char-equal c d))
-                     :collect (prog1 c
-                                (stream-read-char cp-stream :eof-char :eof)))))
+  (let ((result (loop
+                  :for c = (peek-char nil stream nil :eof)
+                  :for d :in (coerce str 'list)
+                  :if (and (not (equal :eof c)) (char-equal c d))
+                    :collect (prog1 c
+                               (read-char stream nil :eof)))))
     (if (= (length str)
            (length result))
-        (list :match cp-stream (concatenate 'string result))
+        (list :match stream (concatenate 'string result))
         (list :no-match stream))))
 
 (defun maybe-match (stream expression)
@@ -64,15 +44,12 @@
 
 (defun many-matches (stream expression)
   "Many pattern to be run on STREAM with EXPRESSION."
-  (let* ((cp-stream stream)
-         (result (loop
-                   :as item = (eval-pattern-or-function expression cp-stream)
-                   :while (equal :match (car item))
-                   :collect (progn
-                              (setf cp-stream (cadr item))
-                              (caddr item)))))
+  (let ((result (loop
+                  :as item = (eval-pattern-or-function expression stream)
+                  :while (equal :match (car item))
+                  :collect (caddr item))))
     (if (> (length result) 0)
-        (list :match cp-stream result)
+        (list :match stream result)
         (list :no-match stream))))
 
 (defun or-match (stream expression)
@@ -87,18 +64,16 @@
 
 (defun and-match (stream expression)
   "And pattern to be run on STREAM with EXPRESSION."
-  (let* ((cp-stream stream)
-         (result (block nil
+  (let* ((result (block nil
                    (loop
                      :for e :in expression
-                     :as item = (eval-pattern-or-function e cp-stream)
-                     :if (equal :match (car item))
-                       :collect (progn
-                                  (setf cp-stream (cadr item))
-                                  (caddr item))
+                     :as item = (eval-pattern-or-function e stream)
+                     :if (progn
+                           (equal :match (car item)))
+                       :collect (caddr item)
                      :else :do (return nil)))))
     (if result
-        (list :match cp-stream result)
+        (list :match stream result)
         (list :no-match stream))))
 
 (defun ispair (x)
@@ -109,8 +84,8 @@
 (defun eval-pattern-or-function (item source)
   "Evaluate a patter or function for ITEM an use SOURCE."
   (if (and (eql (type-of item) 'cons)
-           (or (ispair item)
-               (eql (type-of (car item)) 'keyword)))
+         (or (ispair item)
+            (eql (type-of (car item)) 'keyword)))
       (let ((r (case (car item)
                  (:char (single-char source (cdr item)))
                  (:string (string-match source (cdr item)))
@@ -128,8 +103,8 @@
   "Generate a function LABEL to parse RULE. Later,
 you can apply a TRANSFORMATION which can be a function
 or a keytword."
-  `(defun ,label (source)
-     (let ((result (eval-pattern-or-function ',rule source)))
+  `(defun ,label (stream)
+     (let ((result (eval-pattern-or-function ',rule stream)))
        (if (equal :match (car result))
            (list :match (cadr result)
                  ,(cond
@@ -183,15 +158,9 @@ or a keytword."
         (cons :and e)
         (car e))))
 
-(defun parse (rules source)
+(defun parse (rules stream)
   "Parse according to the RULES on SOURCE."
-  (let* ((stream (make-text-stream :cursor 0
-                                   :text source
-                                   :line 0
-                                   :column 0
-                                   :length (length source))))
-    (let ((result (funcall rules stream)))
-      (caddr result))))
+  (caddr (funcall rules stream)))
 
 (defmacro define-grammar (spec &rest rules)
   "Generates the parser with SPEC and all the RULES."
@@ -210,5 +179,10 @@ or a keytword."
                                      (car ex)))))
                       `(define-rule ,label ,pr :call ,transform)))
                   rules)
-     (defun ,(car spec) (stream)
-       (parse (function ,(cdr spec)) stream))))
+     (defun ,(car spec) (source)
+       (let ((stream (utf8-input-stream:make-utf8-input-stream
+                      (flex:make-in-memory-input-stream
+                       (flex:string-to-octets
+                        source
+                        :external-format (flex:make-external-format :utf-8))))))
+         (parse (function ,(cdr spec)) stream)))))

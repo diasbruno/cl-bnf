@@ -2,14 +2,13 @@
 
 (quicklisp:quickload :cl-bnf-tests)
 
-(setq fiveam:*on-error* :debug)
-
 (in-package #:cl-user)
 
 (setf *debugger-hook*
       (lambda (c h)
         (declare (ignore c h))
-        (uiop:quit -1)))
+        (uiop:quit -1))
+      fiveam:*on-error* :debug)
 
 (unless (fiveam:run-all-tests)
   (exit :code 1 :abort t))

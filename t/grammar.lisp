@@ -11,7 +11,7 @@
 (define-rule identifier
     (:* . single-character)
   :call (lambda (x)
-	  (cons :identifier (coerce x 'string))))
+          (cons :identifier (coerce x 'string))))
 
 (define-rule abc
     (:string . "abc"))
@@ -21,8 +21,9 @@
 
 (define-rule repeat-abc2
     (:* . (:or (:and abc
-		     (:* . (:char . #\space)))
-	       abc)))
+                     (:* . (:char . #\space))
+                     abc)
+               abc)))
 
 (define-rule spaces
     (:* . (:char . #\space)))
@@ -30,20 +31,24 @@
 (define-rule number-literal
     (:* . #'numeric-char-p)
   :call (lambda (value)
-	  (cons :number (coerce value 'string))))
+          (print value)
+          (cons :number (coerce value 'string))))
 
 (define-grammar (language . kv)
   kv := identifier "-" number-literal
   :on (lambda (v) (list :assignment (car v) (caddr v))))
 
 (5am:def-test test-composition ()
-  (5am:is (equal (parse #'repeat-abc "abcabc")
-		 '("abc" "abc"))))
+  (with-utf8-input-stream (s "abcabc")
+    (5am:is (equal (parse #'repeat-abc s)
+                   '("abc" "abc")))))
 
 (5am:def-test test-composition2 ()
-  (5am:is (equal (parse #'repeat-abc2 "abc  abc")
-		 '(("abc" (#\  #\ )) "abc"))))
+  (with-utf8-input-stream (s "abc abc")
+    (5am:is (equal (parse #'repeat-abc2 s)
+                   '(("abc" (#\SPACE) "abc"))))))
 
 (5am:def-test test-assignment ()
-  (5am:is (equal (parse #'kv "a-1")
-		 '(:assignment (:identifier . "a") (:number . "1")))))
+  (with-utf8-input-stream (s "a-1")
+    (5am:is (equal (parse #'kv s)
+                   '(:assignment (:identifier . "a") (:number . "1"))))))
