@@ -17,10 +17,12 @@
         (incf (text-stream-cursor ts)))
       eof-char))
 
-(defun back-char (ts)
-  "Move backward one char on TS."
-  (setf (text-stream-cursor ts)
-        (max (decf (text-stream-cursor ts)) 0)))
+(defun lpeek-char (ts &key eof-char)
+  "Look ahead the next char."
+  (if (< (text-stream-cursor ts) (text-stream-length ts))
+      (char (text-stream-text ts)
+            (text-stream-cursor ts))
+      eof-char))
 
 (defmacro one (stream pred)
   "Get a single char from the STREAM and test against PRED."
@@ -42,16 +44,15 @@
   "String pattern to be run on STREAM with STRING."
   (let* ((cp-stream (copy-text-stream stream))
          (result (loop
-                   :for c = (next-char cp-stream :eof-char :eof)
+                   :for c = (lpeek-char cp-stream :eof-char :eof)
                    :for d :in (coerce str 'list)
                    :if (and (not (equal :eof c))
                             (char-equal c d))
-                     :collect c)))
+                     :collect (prog1 c
+                                (next-char cp-stream :eof-char :eof)))))
     (if (= (length str)
            (length result))
-        (progn
-          (back-char cp-stream)
-          (list :match cp-stream (concatenate 'string result)))
+        (list :match cp-stream (concatenate 'string result))
         (list :no-match stream))))
 
 (defun maybe-match (stream expression)
