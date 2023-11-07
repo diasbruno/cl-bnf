@@ -9,7 +9,7 @@
 (defstruct text-stream
   cursor text line column length)
 
-(defun next-char (ts &key eof-char)
+(defun stream-read-char (ts &key eof-char)
   "Look ahead the next char."
   (if (< (text-stream-cursor ts) (text-stream-length ts))
       (prog1 (char (text-stream-text ts)
@@ -17,7 +17,7 @@
         (incf (text-stream-cursor ts)))
       eof-char))
 
-(defun lpeek-char (ts &key eof-char)
+(defun stream-peek-char (ts &key eof-char)
   "Look ahead the next char."
   (if (< (text-stream-cursor ts) (text-stream-length ts))
       (char (text-stream-text ts)
@@ -27,7 +27,7 @@
 (defmacro one (stream pred)
   "Get a single char from the STREAM and test against PRED."
   `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (next-char cpy-stream)))
+          (current (stream-read-char cpy-stream)))
      (if (and current (funcall ,pred current))
          (list :match cpy-stream current)
          (list :no-match ,stream))))
@@ -35,7 +35,7 @@
 (defmacro single-char (stream char)
   "Get a single char from the STREAM and test against CHAR."
   `(let* ((cpy-stream (copy-text-stream ,stream))
-          (current (next-char cpy-stream)))
+          (current (stream-read-char cpy-stream)))
      (if (and current (char-equal ,char current))
          (list :match cpy-stream current)
          (list :no-match ,stream))))
@@ -44,12 +44,12 @@
   "String pattern to be run on STREAM with STRING."
   (let* ((cp-stream (copy-text-stream stream))
          (result (loop
-                   :for c = (lpeek-char cp-stream :eof-char :eof)
+                   :for c = (stream-peek-char cp-stream :eof-char :eof)
                    :for d :in (coerce str 'list)
                    :if (and (not (equal :eof c))
                             (char-equal c d))
                      :collect (prog1 c
-                                (next-char cp-stream :eof-char :eof)))))
+                                (stream-read-char cp-stream :eof-char :eof)))))
     (if (= (length str)
            (length result))
         (list :match cp-stream (concatenate 'string result))
