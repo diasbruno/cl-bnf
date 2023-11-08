@@ -179,10 +179,5 @@ or a keytword."
                                      (car ex)))))
                       `(define-rule ,label ,pr :call ,transform)))
                   rules)
-     (defun ,(car spec) (source)
-       (let ((stream (utf8-input-stream:make-utf8-input-stream
-                      (flex:make-in-memory-input-stream
-                       (flex:string-to-octets
-                        source
-                        :external-format (flex:make-external-format :utf-8))))))
-         (parse (function ,(cdr spec)) stream)))))
+     (defun ,(car spec) (stream)
+       (parse (function ,(cdr spec)) stream))))
