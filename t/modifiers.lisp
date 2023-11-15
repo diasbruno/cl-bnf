@@ -5,29 +5,29 @@
 
 (5am:in-suite test-modifier-suite)
 
-(define-rule single-character
+(cl-bnf:define-rule single-character
     (:char . #\a))
 
 (5am:def-test test-single-char ()
-  (with-utf8-input-stream (s "a")
-   (5am:is (char-equal (parse #'single-character s) #\a)))
-  (with-utf8-input-stream (s "b")
-   (5am:is (null (parse #'single-character s)))))
+  (with-input-stream (s "a")
+   (5am:is (char-equal (cl-bnf:parse #'single-character s) #\a)))
+  (with-input-stream (s "b")
+   (5am:is (null (cl-bnf:parse #'single-character s)))))
 
-(define-rule many-with-single-char
+(cl-bnf:define-rule many-with-single-char
     (:* . (:char . #\a)))
 
 (5am:def-test test-many-with-single-char ()
-  (with-utf8-input-stream (s "aa")
-   (5am:is (equal (parse #'many-with-single-char s) '(#\a #\a))))
-  (with-utf8-input-stream (s "11")
-   (5am:is (null (parse #'many-with-single-char s)))))
+  (with-input-stream (s "aa")
+   (5am:is (equal (cl-bnf:parse #'many-with-single-char s) '(#\a #\a))))
+  (with-input-stream (s "11")
+   (5am:is (null (cl-bnf:parse #'many-with-single-char s)))))
 
-(define-rule many-using-declared-rule
+(cl-bnf:define-rule many-using-declared-rule
     (:* . single-character))
 
 (5am:def-test test-many-using-declared-rule ()
-  (with-utf8-input-stream (s "aa")
-    (5am:is (equal (parse #'many-using-declared-rule s) '(#\a #\a))))
-  (with-utf8-input-stream (s "11")
-    (5am:is (null (parse #'many-using-declared-rule s)))))
+  (with-input-stream (s "aa")
+    (5am:is (equal (cl-bnf:parse #'many-using-declared-rule s) '(#\a #\a))))
+  (with-input-stream (s "11")
+    (5am:is (null (cl-bnf:parse #'many-using-declared-rule s)))))

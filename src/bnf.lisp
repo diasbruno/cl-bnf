@@ -12,7 +12,8 @@
      (if (and (not (equal :eof current)) (funcall ,pred current))
          (prog1 (list :match ,stream current)
            (read-char ,stream nil nil))
-         (list :no-match ,stream))))
+         (progn
+           (list :no-match ,stream)))))
 
 (defmacro single-char (stream char)
   "Get a single char from the STREAM and test against CHAR."
@@ -20,11 +21,13 @@
      (if (and (not (equal :eof current)) (char-equal ,char current))
          (prog1 (list :match ,stream current)
            (read-char ,stream nil nil))
-         (list :no-match ,stream))))
+         (progn
+           (list :no-match ,stream)))))
 
 (defun string-match (stream str)
   "String pattern to be run on STREAM with STRING."
-  (let ((result (loop
+  (let ((p (file-position stream))
+        (result (loop
                   :for c = (peek-char nil stream nil :eof)
                   :for d :in (coerce str 'list)
                   :if (and (not (equal :eof c)) (char-equal c d))
@@ -33,7 +36,9 @@
     (if (= (length str)
            (length result))
         (list :match stream (concatenate 'string result))
-        (list :no-match stream))))
+        (progn
+          (file-position stream p)
+          (list :no-match stream)))))
 
 (defun maybe-match (stream expression)
   "Maybe pattern to be run on STREAM with EXPRESSION."
@@ -50,12 +55,14 @@
                   :collect (caddr item))))
     (if (> (length result) 0)
         (list :match stream result)
-        (list :no-match stream))))
+        (progn
+          (list :no-match stream)))))
 
 (defun or-match (stream expression)
   "Or pattern to be run on STREAM with EXPRESSION."
   (if (null expression)
-      (list :no-match stream)
+      (progn
+        (list :no-match stream))
       (let* ((c (car expression))
              (result (eval-pattern-or-function c stream)))
         (if (equal :match (car result))
@@ -64,17 +71,20 @@
 
 (defun and-match (stream expression)
   "And pattern to be run on STREAM with EXPRESSION."
-  (let* ((result (block nil
-                   (loop
-                     :for e :in expression
-                     :as item = (eval-pattern-or-function e stream)
-                     :if (progn
-                           (equal :match (car item)))
-                       :collect (caddr item)
-                     :else :do (return nil)))))
+  (let ((p (file-position stream))
+        (result (block nil
+                  (loop
+                    :for e :in expression
+                    :as item = (eval-pattern-or-function e stream)
+                    :if (progn
+                          (equal :match (car item)))
+                      :collect (caddr item)
+                    :else :do (return nil)))))
     (if result
         (list :match stream result)
-        (list :no-match stream))))
+        (progn
+          (file-position stream p)
+          (list :no-match stream)))))
 
 (defun ispair (x)
   (and (eql (type-of x) 'cons)

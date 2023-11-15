@@ -6,6 +6,10 @@
 
 (in-package :cl-bnf-json-example)
 
+(defmacro with-utf8-input-stream ((var source) &body body)
+  `(let ((,var (make-string-input-stream ,source)))
+     ,@body))
+
 (defun stringify (vs)
   (if vs
       (case (type-of vs)
@@ -107,4 +111,4 @@
         "{\"a\":}"
         )))
   (dolist (str strs)
-    (format t "result: ~A~%" (json str))))
+    (format t "result: ~A~%" (json (make-string-input-stream str)))))

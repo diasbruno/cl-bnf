@@ -59,4 +59,4 @@ jobs:
       - name: run
         run: |
           ros use sbcl
-          LISP=sbcl-bin make tests
+          LISP="ros run --" make tests

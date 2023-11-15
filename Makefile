@@ -1,7 +1,7 @@
 ENV?=development
 
 ## run through roswell
-LISP=ros run --
+LISP?=sbcl
 
 LISPFLAGS=--quit --non-interactive
 
